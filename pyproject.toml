@@ -1,0 +1,26 @@
+[project]
+name = "split-gvcf"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Jose Blanca", email = "jblanca@upv.es" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "genomicranges>=0.7.1",
+    "iranges>=0.5.2",
+    "numpy>=2.3.1",
+]
+
+[project.scripts]
+split-gvcf = "split_gvcf:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+]
