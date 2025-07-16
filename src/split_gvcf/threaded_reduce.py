@@ -23,24 +23,33 @@ def _create_future_from_value(value):
     return future
 
 
+def _next_generation_futures(futures, executor, function):
+    results = (f.result() for f in futures)
+    for pair in _pairwise(results):
+        if len(pair) == 2:
+            yield executor.submit(function, *pair)
+        else:
+            yield _create_future_from_value(pair[0])
+
+
 def _accumulate_futures(initial_futures, executor, function):
-    futures = list(initial_futures)
+    futures = initial_futures
 
-    while len(futures) > 1:
-        results = (future.result() for future in futures)
-        paired_items = _pairwise(results)
+    while True:
+        it = iter(futures)
+        try:
+            first_future = next(it)
+        except StopIteration:
+            raise ValueError("Cannot reduce empty iterable")
 
-        new_futures = []
-        for pair in paired_items:
-            if len(pair) == 2:
-                new_futures.append(executor.submit(function, *pair))
-            else:
-                # single leftover, wrap it in a completed future
-                new_futures.append(_create_future_from_value(pair[0]))
-        futures = new_futures
+        try:
+            second_future = next(it)
+        except StopIteration:
+            return first_future.result()
 
-    final_result = futures[0].result()
-    return final_result
+        futures = _next_generation_futures(
+            [first_future, second_future, *it], executor, function
+        )
 
 
 def reduce(function, iterable: Iterable, max_workers: int):
