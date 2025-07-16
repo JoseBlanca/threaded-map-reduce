@@ -52,10 +52,3 @@ def parse_gvcf_into_ranges(fhand) -> GenomicRanges:
     ranges = iranges.IRanges(starts, widths)
     ranges = GenomicRanges(seqnames=seq_names, ranges=ranges)
     return ranges
-
-
-def parse_gvcfs_into_ranges(
-    fhands: Iterator[BinaryIO], max_threads=1
-) -> Iterator[GenomicRanges]:
-    with ThreadPoolExecutor(max_workers=max_threads) as executor:
-        yield from executor.map(parse_gvcf_into_ranges, fhands)
