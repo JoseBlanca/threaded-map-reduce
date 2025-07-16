@@ -2,7 +2,11 @@ from io import BytesIO
 
 import numpy
 
-from split_gvcf.gvcf_parser import parse_gvcf, parse_gvcf_into_ranges
+from split_gvcf.gvcf_parser import (
+    parse_gvcf,
+    parse_gvcf_into_ranges,
+    parse_gvcfs_into_ranges,
+)
 
 VCF = b"""##fileformat=VCFv4.5
 #CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tNA00001\tNA00002\tNA00003
@@ -25,3 +29,9 @@ def test_parse_into_ranges():
     fhand = BytesIO(VCF)
     ranges = parse_gvcf_into_ranges(fhand)
     assert numpy.all(ranges.start == [10, 30, 40, 50])
+
+
+def test_parse_in_parallel():
+    fhands = [BytesIO(VCF) for _ in range(20)]
+    for ranges in parse_gvcfs_into_ranges(iter(fhands), max_threads=5):
+        print(ranges)

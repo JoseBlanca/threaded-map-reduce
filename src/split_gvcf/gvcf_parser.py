@@ -1,6 +1,7 @@
 from enum import Enum
-from typing import Iterator, Tuple
+from typing import Iterator, Tuple, BinaryIO
 from array import array
+from concurrent.futures import ThreadPoolExecutor
 
 import iranges
 from genomicranges import GenomicRanges
@@ -51,3 +52,10 @@ def parse_gvcf_into_ranges(fhand) -> GenomicRanges:
     ranges = iranges.IRanges(starts, widths)
     ranges = GenomicRanges(seqnames=seq_names, ranges=ranges)
     return ranges
+
+
+def parse_gvcfs_into_ranges(
+    fhands: Iterator[BinaryIO], max_threads=1
+) -> Iterator[GenomicRanges]:
+    with ThreadPoolExecutor(max_workers=max_threads) as executor:
+        yield from executor.map(parse_gvcf_into_ranges, fhands)
