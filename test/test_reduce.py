@@ -1,7 +1,7 @@
 from operator import add
 from functools import reduce as funct_reduce
 
-from split_gvcf.threaded_map_reduce import map_reduce, reduce
+from threaded_map_reduce.threaded_map_reduce import map_reduce, reduce
 
 
 def test_reduce():

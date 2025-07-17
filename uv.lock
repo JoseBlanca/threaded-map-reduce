@@ -94,7 +94,7 @@ wheels = [
 ]
 
 [[package]]
-name = "split-gvcf"
+name = "threaded-map-reduce"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
