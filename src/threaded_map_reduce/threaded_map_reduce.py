@@ -70,5 +70,4 @@ def reduce(function, iterable: Iterable, max_workers: int):
 def map_reduce(map_fn, reduce_fn, iterable: Iterable, max_workers: int):
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         mapped_futures = (executor.submit(map_fn, item) for item in iterable)
-        print("mapped")
         return _accumulate_futures(mapped_futures, executor, reduce_fn)
