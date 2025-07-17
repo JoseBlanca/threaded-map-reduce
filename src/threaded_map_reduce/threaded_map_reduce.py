@@ -1,5 +1,6 @@
 from typing import Iterable
 from concurrent.futures import ThreadPoolExecutor, Future
+from itertools import chain
 
 
 def _pairwise(iterable):
@@ -47,9 +48,8 @@ def _accumulate_futures(initial_futures, executor, function):
         except StopIteration:
             return first_future.result()
 
-        futures = _next_generation_futures(
-            [first_future, second_future, *it], executor, function
-        )
+        remaining_futures = chain(iter((first_future, second_future)), it)
+        futures = _next_generation_futures(remaining_futures, executor, function)
 
 
 def reduce(function, iterable: Iterable, max_workers: int):
@@ -70,4 +70,5 @@ def reduce(function, iterable: Iterable, max_workers: int):
 def map_reduce(map_fn, reduce_fn, iterable: Iterable, max_workers: int):
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         mapped_futures = (executor.submit(map_fn, item) for item in iterable)
+        print("mapped")
         return _accumulate_futures(mapped_futures, executor, reduce_fn)
