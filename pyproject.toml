@@ -1,20 +1,15 @@
 [project]
-name = "split-gvcf"
+name = "threaded_map_reduce"
 version = "0.1.0"
-description = "Add your description here"
+description = "A threaded version of map reduce"
 readme = "README.md"
 authors = [
     { name = "Jose Blanca", email = "jblanca@upv.es" }
 ]
 requires-python = ">=3.13"
 dependencies = [
-    "genomicranges>=0.7.1",
-    "iranges>=0.5.2",
     "numpy>=2.3.1",
 ]
-
-[project.scripts]
-split-gvcf = "split_gvcf:main"
 
 [build-system]
 requires = ["hatchling"]

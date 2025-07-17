@@ -3,31 +3,6 @@ revision = 2
 requires-python = ">=3.13"
 
 [[package]]
-name = "biocframe"
-version = "0.6.3"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "biocutils" },
-    { name = "numpy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/c2/8e/bab85a6baa2c8294edde65bcd0c939a16611caf361fa66e90d0846be7f44/biocframe-0.6.3.tar.gz", hash = "sha256:14bff1f38a44d12922f5f70691dbda4744baabc972d9828bce63d605eff1169e", size = 47365, upload-time = "2025-03-29T02:24:06.904Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/64/04/cbbbf16108eb6af46ab5a2cc366a10694847dabb96817291ef214e052423/biocframe-0.6.3-py3-none-any.whl", hash = "sha256:5d05778af7645403febc434dee73f7304060ef1b655c58e7385498b067d33354", size = 19651, upload-time = "2025-03-29T02:24:05.573Z" },
-]
-
-[[package]]
-name = "biocutils"
-version = "0.2.3"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/59/cb/404e7da59034accc8ea57771e73d471c5f291d2e2e74e13201f1b3d5d398/biocutils-0.2.3.tar.gz", hash = "sha256:6e693de208ad8507fdb9eb5829b6dc7d7a981b2f9f8c81b4fed9a1607e79fa8b", size = 60478, upload-time = "2025-05-07T04:11:18.991Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/23/f7/a5e64053786509f7bc0b5b77fbb68709035c219f72e35e3103351a21ee60/biocutils-0.2.3-py3-none-any.whl", hash = "sha256:dbcfda1d220cb4915baacb92d9d0df1e4eac1799ce62b1189731d0415bf8838e", size = 47370, upload-time = "2025-05-07T04:11:17.625Z" },
-]
-
-[[package]]
 name = "colorama"
 version = "0.4.6"
 source = { registry = "https://pypi.org/simple" }
@@ -37,44 +12,12 @@ wheels = [
 ]
 
 [[package]]
-name = "genomicranges"
-version = "0.7.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "biocframe" },
-    { name = "biocutils" },
-    { name = "iranges" },
-    { name = "numpy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/3a/a5/e046d1bb69faf99cf22630be3b9e0c3d3708c1bd6170dcdf40c988c2f731/genomicranges-0.7.1.tar.gz", hash = "sha256:08af513d927d45e17a1d8989f4c162817677491c0b23016d9a5584b78d167aec", size = 77655, upload-time = "2025-07-03T00:13:10.408Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/9b/81/a268f63533bf7990ba5d8c883adac3292352c49e895864f2d4e7896c467d/genomicranges-0.7.1-py3-none-any.whl", hash = "sha256:f1de29797c85accb7672301184625a6dd020028b51307fb2ddf8394cad2384d3", size = 41289, upload-time = "2025-07-03T00:13:08.773Z" },
-]
-
-[[package]]
 name = "iniconfig"
 version = "2.1.0"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f2/97/ebf4da567aa6827c909642694d71c9fcf53e5b504f2d96afea02718862f3/iniconfig-2.1.0.tar.gz", hash = "sha256:3abbd2e30b36733fee78f9c7f7308f2d0050e88f0087fd25c2645f63c773e1c7", size = 4793, upload-time = "2025-03-19T20:09:59.721Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2c/e1/e6716421ea10d38022b952c159d5161ca1193197fb744506875fbb87ea7b/iniconfig-2.1.0-py3-none-any.whl", hash = "sha256:9deba5723312380e77435581c6bf4935c94cbfab9b1ed33ef8d238ea168eb760", size = 6050, upload-time = "2025-03-19T20:10:01.071Z" },
-]
-
-[[package]]
-name = "iranges"
-version = "0.5.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "biocframe" },
-    { name = "biocutils" },
-    { name = "numpy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/80/7e/080c6d16e781ba1c9604bb9e2c4488b1082ed2620125f5d8b1e30bdcb1d7/iranges-0.5.2.tar.gz", hash = "sha256:a9a4cf511e85965894da44c931d1695daf6079f92eb9d38f15e3264b4877e8e4", size = 57458, upload-time = "2025-07-02T05:16:44.621Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/fd/a6/a804c3fe3934c221b23c2c3b3c843c5e3ee6d66c590ee823a0a57ac8cfd6/iranges-0.5.2-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:a8dc0af00477fc45198a05eebfe73642e06bfc0256a46ae76df4e27a6ca2e32a", size = 161320, upload-time = "2025-07-02T05:16:33.065Z" },
-    { url = "https://files.pythonhosted.org/packages/18/7f/7445ed6b662251b004d7d36ffd26a8045dfa6eeb798d4accd9fafdd1f3b0/iranges-0.5.2-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:1b591b3d1f6b613b2379a98a72379a94b986a7fba8f6ada93ee91d4608d81955", size = 145600, upload-time = "2025-07-02T05:16:34.211Z" },
-    { url = "https://files.pythonhosted.org/packages/66/4c/8543e303ef9a30576263d9beed6ab57c60c730715808b2aa805fff0a2d1b/iranges-0.5.2-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4a8925742bac35489f96357fc33d28fef4b3ec9fd58be4e1bcc601719783c8d0", size = 182180, upload-time = "2025-07-02T05:16:35.363Z" },
-    { url = "https://files.pythonhosted.org/packages/01/4d/ba25b2286fdc0b449c09281e07f3c7a79244ed8faef3dd087e7c021549bd/iranges-0.5.2-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:1efacce824af38b12e451f844a154bbad4a45e5c25dc623545bdf60fb0829871", size = 1155825, upload-time = "2025-07-02T05:16:37.107Z" },
 ]
 
 [[package]]
@@ -155,8 +98,6 @@ name = "split-gvcf"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "genomicranges" },
-    { name = "iranges" },
     { name = "numpy" },
 ]
 
@@ -166,11 +107,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "genomicranges", specifier = ">=0.7.1" },
-    { name = "iranges", specifier = ">=0.5.2" },
-    { name = "numpy", specifier = ">=2.3.1" },
-]
+requires-dist = [{ name = "numpy", specifier = ">=2.3.1" }]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=8.4.1" }]
