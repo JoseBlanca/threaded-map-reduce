@@ -299,31 +299,38 @@ def _get_items_from_queue(items_queue, results_queue):
             break
 
 
-def _map_reduce_items_from_queue(items_queue, results_queue, map_fn, reduce_fn):
-    result = functools.reduce(
-        reduce_fn, map(map_fn, _get_items_from_queue(items_queue, results_queue))
+def _map_reduce_items_from_queue(chunks_queue, results_queue, map_fn, reduce_fn):
+    chunk_results = (
+        functools.reduce(reduce_fn, map(map_fn, chunk))
+        for chunk in _get_items_from_queue(chunks_queue, results_queue)
     )
+    result = functools.reduce(reduce_fn, chunk_results)
     results_queue.put(result)
 
 
-def _feed_items(items, items_queue):
-    for item in items:
-        items_queue.put(item)
-    items_queue.shutdown()
+def _feed_chunks(items, num_items_per_chunk, chunks_queue):
+    for chunk in _create_chunks(
+        items,
+        num_items_per_chunk,
+    ):
+        chunks_queue.put(chunk)
+    chunks_queue.shutdown()
 
 
 def map_reduce_with_thread_pool(
     map_fn, reduce_fn, iterable: Iterable, max_workers: int
 ):
     num_threads = max_workers
+    num_items_per_chunk = 10000
+
     items = iter(iterable)
-    items_queue = queue.Queue()
+    chunks_queue = queue.Queue()
     results_queue = queue.Queue()
     map_reduce_items = functools.partial(
         _map_reduce_items_from_queue,
         map_fn=map_fn,
         reduce_fn=reduce_fn,
-        items_queue=items_queue,
+        chunks_queue=chunks_queue,
         results_queue=results_queue,
     )
 
@@ -333,7 +340,9 @@ def map_reduce_with_thread_pool(
         thread.start()
         computing_threads.append(thread)
 
-    item_feeder_thread = threading.Thread(target=_feed_items, args=(items, items_queue))
+    item_feeder_thread = threading.Thread(
+        target=_feed_chunks, args=(items, num_items_per_chunk, chunks_queue)
+    )
     item_feeder_thread.start()
 
     results = []
