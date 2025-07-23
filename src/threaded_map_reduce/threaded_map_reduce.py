@@ -318,11 +318,12 @@ def _feed_chunks(items, num_items_per_chunk, chunks_queue):
 
 
 def map_reduce_with_thread_pool(
-    map_fn, reduce_fn, iterable: Iterable, max_workers: int
+    map_fn,
+    reduce_fn,
+    iterable: Iterable,
+    num_computing_threads: int,
+    num_items_per_chunk: int,
 ):
-    num_threads = max_workers
-    num_items_per_chunk = 10000
-
     items = iter(iterable)
     chunks_queue = queue.Queue()
     results_queue = queue.Queue()
@@ -335,7 +336,7 @@ def map_reduce_with_thread_pool(
     )
 
     computing_threads = []
-    for _ in range(num_threads):
+    for _ in range(num_computing_threads):
         thread = threading.Thread(target=map_reduce_items)
         thread.start()
         computing_threads.append(thread)
@@ -359,3 +360,4 @@ def map_reduce_with_thread_pool(
 
 
 map_reduce = map_reduce_with_thread_pool
+# map_reduce = simple_map_reduce
