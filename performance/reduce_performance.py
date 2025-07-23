@@ -46,8 +46,15 @@ def check_add_numbers_performance():
     numbers_to_add = 20000000
     res = add_numbers_standard(numbers_to_add)
     print("standard: ", res["time_used"], res["result"])
-    res = add_numbers_threaded(numbers_to_add, 4, 1000)
-    print("threaded: ", res["time_used"], res["result"])
+    for num_items in range(50, 450, 50):
+        res = add_numbers_threaded(numbers_to_add, 4, num_items)
+        print(f"threaded, num_items ({num_items}): ", res["time_used"], res["result"])
+
+    for num_threads in range(1, 6):
+        res = add_numbers_threaded(numbers_to_add, num_threads, 1000)
+        print(
+            f"threaded, num_threads ({num_threads}): ", res["time_used"], res["result"]
+        )
 
 
 def do_sleeping_standard(seconds_to_sleep, number_of_sleeps):
@@ -91,4 +98,4 @@ def check_sleeping_performance():
 
 if __name__ == "__main__":
     check_add_numbers_performance()
-    check_sleeping_performance()
+    # check_sleeping_performance()
