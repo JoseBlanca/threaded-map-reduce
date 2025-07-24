@@ -287,11 +287,10 @@ def simple_map_reduce(
     )
 
     result = functools.reduce(reduce_fn, first_round_map_reduce_results)
-    print(result)
     return result
 
 
-def _get_items_from_queue(items_queue, results_queue):
+def _get_items_from_queue(items_queue):
     while True:
         try:
             yield items_queue.get()
@@ -299,12 +298,26 @@ def _get_items_from_queue(items_queue, results_queue):
             break
 
 
+class _UnusedThread:
+    pass
+
+
+UNUSED_THREAD = _UnusedThread()
+
+
 def _map_reduce_items_from_queue(chunks_queue, results_queue, map_fn, reduce_fn):
     chunk_results = (
         functools.reduce(reduce_fn, map(map_fn, chunk))
-        for chunk in _get_items_from_queue(chunks_queue, results_queue)
+        for chunk in _get_items_from_queue(chunks_queue)
     )
-    result = functools.reduce(reduce_fn, chunk_results)
+    try:
+        result = functools.reduce(reduce_fn, chunk_results)
+    except TypeError as error:
+        if "empty iterable" in str(error):
+            result = UNUSED_THREAD
+        else:
+            raise
+
     results_queue.put(result)
 
 
@@ -346,11 +359,16 @@ def map_reduce_with_thread_pool(
     )
     item_feeder_thread.start()
 
+    # TODO, this might be transformed into an iterator
     results = []
+    unused_threads = 0
     while True:
         result = results_queue.get()
-        results.append(result)
-        if len(results) == len(computing_threads):
+        if result is UNUSED_THREAD:
+            unused_threads += 1
+        else:
+            results.append(result)
+        if len(results) == len(computing_threads) - unused_threads:
             results_queue.shutdown()
             break
 
