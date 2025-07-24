@@ -1,13 +1,27 @@
 from operator import add
 from functools import reduce, partial
 from time import time, sleep
+from pathlib import Path
+import sys
+
+import matplotlib.pyplot as plt
+import numpy
 
 from threaded_map_reduce.threaded_map_reduce import map_reduce
 
 
-def wait(_, seconds):
+def wait_sleep(_, seconds):
     sleep(seconds)
-    return 1
+    return seconds
+
+
+def wait_cpu(_, seconds):
+    start_time = time()
+    while True:
+        elapsed = time() - start_time
+        if elapsed >= seconds:
+            break
+    return elapsed
 
 
 def square(num):
@@ -121,19 +135,23 @@ def check_count_primes_performance():
         )
 
 
-def do_sleeping_standard(seconds_to_sleep, number_of_sleeps):
-    do_waiting = partial(wait, seconds=seconds_to_sleep)
+def do_sleeping_standard(seconds_to_sleep, number_of_sleeps, function):
+    do_waiting = partial(function, seconds=seconds_to_sleep)
     start_time = time()
     res = map(do_waiting, range(number_of_sleeps))
     res = reduce(add, res)
     end_time = time()
-    return {"time_used": end_time - start_time, "result": res}
+    return {"time_used": end_time - start_time}
 
 
 def do_sleeping_threaded(
-    seconds_to_sleep, number_of_sleeps, num_computing_threads, num_items_per_chunk
+    seconds_to_sleep,
+    number_of_sleeps,
+    num_computing_threads,
+    num_items_per_chunk,
+    function,
 ):
-    do_waiting = partial(wait, seconds=seconds_to_sleep)
+    do_waiting = partial(function, seconds=seconds_to_sleep)
     start_time = time()
     res = map_reduce(
         do_waiting,
@@ -146,25 +164,119 @@ def do_sleeping_threaded(
     return {"time_used": end_time - start_time, "result": res}
 
 
-def check_sleeping_performance():
-    for seconds_to_sleep in (0.00001, 0.1, 1):
-        print("seconds_to_sleep", seconds_to_sleep)
-        number_of_sleeps = int(10 / seconds_to_sleep)
+def check_sleeping_performance(
+    num_seconds_sleeping_per_step, total_num_seconds_sleeping, function
+):
+    num_threads = []
+    time_used = []
+    results = []
+    for n_threads in range(1, 17):
+        num_seconds_sleeping_per_thread = total_num_seconds_sleeping / n_threads
+        number_of_sleeps_in_thread = round(
+            num_seconds_sleeping_per_thread / num_seconds_sleeping_per_step
+        )
+        if not number_of_sleeps_in_thread:
+            number_of_sleeps_in_thread = 1
+        actual_num_seconds_sleeping_per_step = total_num_seconds_sleeping / (
+            number_of_sleeps_in_thread * n_threads
+        )
+        if not number_of_sleeps_in_thread:
+            number_of_sleeps_in_thread = 1
+        res = do_sleeping_threaded(
+            actual_num_seconds_sleeping_per_step,
+            number_of_sleeps_in_thread * n_threads,
+            num_computing_threads=n_threads,
+            num_items_per_chunk=1,
+            function=function,
+        )
+        num_threads.append(n_threads)
+        time_used.append(res["time_used"])
+        results.append(res["result"])
+    return {
+        "n_threads": numpy.array(num_threads),
+        "time_used": numpy.array(time_used),
+        "results": numpy.array(results),
+    }
 
-        # res = do_sleeping_standard(seconds_to_sleep, number_of_sleeps)
-        # print("standard: ", res["time_used"])
-        number_of_sleeps = 2
-        for n_threads in range(1, 17):
-            res = do_sleeping_threaded(
-                seconds_to_sleep,
-                number_of_sleeps,
-                num_computing_threads=n_threads,
-                num_items_per_chunk=1,
-            )
-            print(f"threaded, n_threads ({n_threads}): ", res["time_used"])
+
+def do_sleep_experiment(function):
+    total_num_seconds_sleepings = (1, 20, 10, 1)
+    num_seconds_sleeping_per_steps = (0.1, 1, 0.1, 0.00001)
+    for num_seconds_sleeping_per_step, total_num_seconds_sleeping in zip(
+        num_seconds_sleeping_per_steps, total_num_seconds_sleepings
+    ):
+        res1 = check_sleeping_performance(
+            num_seconds_sleeping_per_step=num_seconds_sleeping_per_step,
+            total_num_seconds_sleeping=total_num_seconds_sleeping,
+            function=function,
+        )
+        print(res1)
+        res2 = do_sleeping_standard(
+            total_num_seconds_sleeping, number_of_sleeps=1, function=function
+        )
+        print(res2)
+        plot_path = (
+            charts_dir
+            / f"slepping.{function.__name__}.{get_python_version()}.time.num_seconds_per_step_{num_seconds_sleeping_per_step}.total_seconds_{total_num_seconds_sleeping}.png"
+        )
+        fig, axes = plt.subplots()
+        axes.plot(
+            res1["n_threads"],
+            res1["time_used"],
+            linestyle="-",
+            marker="o",
+            color="blue",
+        )
+        axes.set_ylim(bottom=0, top=axes.get_ylim()[1])
+        axes.set_ylabel("Time (s)")
+        axes.set_xlabel("Num. threads")
+
+        axes.hlines(
+            res2["time_used"],
+            xmin=min(res1["n_threads"]),
+            xmax=max(res1["n_threads"]),
+            color="red",
+        )
+        fig.savefig(str(plot_path))
+        plot_path = (
+            charts_dir
+            / f"slepping.{function.__name__}.{get_python_version()}.efficiency.num_seconds_per_step_{num_seconds_sleeping_per_step}.total_seconds_{total_num_seconds_sleeping}.png"
+        )
+        speedup = res1["time_used"][0] / res1["time_used"]
+        efficiency = speedup / res1["n_threads"]
+        fig, axes = plt.subplots()
+        axes.plot(
+            res1["n_threads"],
+            efficiency,
+            linestyle="-",
+            marker="o",
+            color="blue",
+        )
+        axes.set_ylim(bottom=0, top=axes.get_ylim()[1])
+        axes.set_ylabel("Efficiency")
+        axes.set_xlabel("Num. threads")
+
+        fig.savefig(str(plot_path))
+
+
+def get_python_version():
+    version_info = sys.version_info
+    version = f"{version_info.major}.{version_info.minor}.{version_info.micro}"
+    if "free-threading" in sys.version:
+        version += "t"
+    return version
 
 
 if __name__ == "__main__":
+    performance_dir = Path(__file__).parent
+    charts_dir = performance_dir / "charts"
+    charts_dir.mkdir(exist_ok=True)
+
+    python = get_python_version()
+
+    do_sleep_experiment(function=wait_cpu)
+    do_sleep_experiment(function=wait_sleep)
+
     # check_add_numbers_performance()
-    check_sleeping_performance()
+
     # check_count_primes_performance()
