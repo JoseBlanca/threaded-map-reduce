@@ -6,10 +6,7 @@ from threaded_map_reduce.threaded_map_reduce import map_reduce
 
 
 def wait(_, seconds):
-    start_time = time()
-    while True:
-        if time() - start_time >= seconds:
-            break
+    sleep(seconds)
     return 1
 
 
@@ -156,6 +153,7 @@ def check_sleeping_performance():
 
         # res = do_sleeping_standard(seconds_to_sleep, number_of_sleeps)
         # print("standard: ", res["time_used"])
+        number_of_sleeps = 2
         for n_threads in range(1, 17):
             res = do_sleeping_threaded(
                 seconds_to_sleep,
