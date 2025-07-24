@@ -98,20 +98,21 @@ def map_reduce_with_thread_pool(
         results_queue=results_queue,
     )
 
+    item_feeder_thread = threading.Thread(
+        target=_feed_chunks, args=(items, num_items_per_chunk, chunks_queue)
+    )
+    item_feeder_thread.start()
+
     computing_threads = []
     for _ in range(num_computing_threads):
         thread = threading.Thread(target=map_reduce_items)
         thread.start()
         computing_threads.append(thread)
 
-    item_feeder_thread = threading.Thread(
-        target=_feed_chunks, args=(items, num_items_per_chunk, chunks_queue)
-    )
-    item_feeder_thread.start()
-
     results = _ComputingThreadsResults(results_queue, num_computing_threads)
+    results = results.get_results()
 
-    result = functools.reduce(reduce_fn, results.get_results())
+    result = functools.reduce(reduce_fn, results)
 
     return result
 
