@@ -52,6 +52,10 @@ def is_prime(n):
     return True
 
 
+def count_prime_numbers_in_range(range_):
+    return sum(is_prime(num) for num in range_)
+
+
 def count_primes_standard(num_numbers):
     numbers = range(1, num_numbers)
     start_time = time()
@@ -120,19 +124,20 @@ def check_add_numbers_performance():
         )
 
 
-def check_count_primes_performance():
-    numbers_to_check = 4000000
-    res = count_primes_standard(numbers_to_check)
-    print("standard: ", res["time_used"], res["result"])
-    for num_items in range(10, 110, 10):
-        res = count_primes_threaded(numbers_to_check, 4, num_items)
-        print(f"threaded, num_items ({num_items}): ", res["time_used"], res["result"])
-
+def check_count_primes_performance(numbers_to_check, num_items_per_chunk):
+    num_threadss = []
+    times_used = []
+    results = []
     for num_threads in range(1, 17):
-        res = count_primes_threaded(numbers_to_check, num_threads, 1000)
-        print(
-            f"threaded, num_threads ({num_threads}): ", res["time_used"], res["result"]
-        )
+        res = count_primes_threaded(numbers_to_check, num_threads, num_items_per_chunk)
+        num_threadss.append(num_threads)
+        times_used.append(res["time_used"])
+        results.append(res["result"])
+    return {
+        "n_threads": numpy.array(num_threadss),
+        "times_used": numpy.array(times_used),
+        "results": numpy.array(results),
+    }
 
 
 def do_sleeping_standard(seconds_to_sleep, number_of_sleeps, function):
@@ -259,6 +264,159 @@ def do_sleep_experiment(function):
         fig.savefig(str(plot_path))
 
 
+def do_prime_experiment():
+    num_numbers_to_check = 1000000
+    num_items_per_chunks = (100000, 10000, 1000, 100, 50, 1)
+
+    for num_items_per_chunk in num_items_per_chunks:
+        non_threaded_result = count_primes_standard(num_numbers_to_check)
+        print(non_threaded_result)
+
+        res = check_count_primes_performance(num_numbers_to_check, num_items_per_chunk)
+        assert numpy.all(res["results"] == non_threaded_result["result"])
+        print(res)
+
+        plot_path = (
+            charts_dir
+            / f"primes.{get_python_version()}.num_numbers_to_check_{num_numbers_to_check}.num_items_per_chunk_{num_items_per_chunk}.time.png"
+        )
+        fig, axes = plt.subplots()
+        axes.plot(
+            res["n_threads"],
+            res["times_used"],
+            linestyle="-",
+            marker="o",
+            color="blue",
+        )
+        axes.set_ylim(bottom=0, top=axes.get_ylim()[1])
+        axes.set_ylabel("Time (s)")
+        axes.set_xlabel("Num. threads")
+        fig.savefig(str(plot_path))
+
+        speedup = res["times_used"][0] / res["times_used"]
+        efficiency = speedup / res["n_threads"]
+        plot_path = (
+            charts_dir
+            / f"primes.{get_python_version()}.num_numbers_to_check_{num_numbers_to_check}.num_items_per_chunk_{num_items_per_chunk}.efficiency.png"
+        )
+        fig, axes = plt.subplots()
+        axes.plot(
+            res["n_threads"],
+            efficiency,
+            linestyle="-",
+            marker="o",
+            color="blue",
+        )
+        axes.set_ylim(bottom=0, top=axes.get_ylim()[1])
+        axes.set_ylabel("Time (s)")
+        axes.set_xlabel("Num. threads")
+        fig.savefig(str(plot_path))
+
+
+def split_range(range_, num_items):
+    start = range_.start
+    stop = range_.stop
+    for this_start in range(start, stop, num_items):
+        this_stop = this_start + num_items
+        if this_stop > stop:
+            this_stop = stop
+        yield range(this_start, this_stop)
+
+
+def count_primes_in_range_standard(ranges_to_check):
+    start_time = time()
+    result = reduce(add, map(count_prime_numbers_in_range, ranges_to_check))
+    end_time = time()
+    return {"time_used": end_time - start_time, "result": result}
+
+
+def check_count_primes_in_range_threaded(
+    ranges_to_check, num_numbers_to_check, n_items_in_range, num_items_per_chunk
+):
+    times = []
+    results = []
+    num_computing_threadss = list(range(1, 17))
+    for num_computing_threads in num_computing_threadss:
+        print("num threads", num_computing_threads)
+        range_to_check = range(2, num_numbers_to_check)
+        ranges_to_check = split_range(range_to_check, n_items_in_range)
+        start_time = time()
+        res = map_reduce(
+            count_prime_numbers_in_range,
+            add,
+            ranges_to_check,
+            num_computing_threads=num_computing_threads,
+            num_items_per_chunk=num_items_per_chunk,
+        )
+        end_time = time()
+        times.append(end_time - start_time)
+        results.append(res)
+        print(times)
+    times = numpy.array(times)
+    results = numpy.array(results)
+
+    return {
+        "times_used": times,
+        "results": results,
+        "n_threads": num_computing_threadss,
+    }
+
+
+def do_prime_range_experiment():
+    n_items_in_range = 10000
+    num_items_per_chunks = (1, 100, 10)
+    num_ranges_total = max(num_items_per_chunks) * 16 * 2
+    num_numbers_to_check = num_ranges_total * n_items_in_range
+
+    experiment_name = "primes_with_ranges"
+
+    for num_items_per_chunk in num_items_per_chunks:
+        range_to_check = range(2, num_numbers_to_check)
+        ranges_to_check = split_range(range_to_check, n_items_in_range)
+        non_threaded_result = count_primes_in_range_standard(ranges_to_check)
+
+        res = check_count_primes_in_range_threaded(
+            ranges_to_check, num_numbers_to_check, n_items_in_range, num_items_per_chunk
+        )
+        assert numpy.all(res["results"] == non_threaded_result["result"])
+
+        plot_path = (
+            charts_dir
+            / f"{experiment_name}.{get_python_version()}.n_numbers_to_check_{num_numbers_to_check}.n_items_in_range_{n_items_in_range}.n_items_per_chunk_{num_items_per_chunk}.time.png"
+        )
+        fig, axes = plt.subplots()
+        axes.plot(
+            res["n_threads"],
+            res["times_used"],
+            linestyle="-",
+            marker="o",
+            color="blue",
+        )
+        axes.set_ylim(bottom=0, top=axes.get_ylim()[1])
+        axes.set_ylabel("Time (s)")
+        axes.set_xlabel("Num. threads")
+        fig.savefig(str(plot_path))
+
+        speedup = res["times_used"][0] / res["times_used"]
+        efficiency = speedup / res["n_threads"]
+        plot_path = (
+            charts_dir
+            / f"{experiment_name}.{get_python_version()}.n_numbers_to_check_{num_numbers_to_check}.n_items_in_range_{n_items_in_range}.n_items_per_chunk_{num_items_per_chunk}.efficiency.png"
+        )
+        fig, axes = plt.subplots()
+        axes.plot(
+            res["n_threads"],
+            efficiency,
+            linestyle="-",
+            marker="o",
+            color="blue",
+        )
+        axes.set_ylim(bottom=0, top=axes.get_ylim()[1])
+        axes.set_ylabel("Efficiency")
+        axes.set_xlabel("Num. threads")
+        fig.savefig(str(plot_path))
+
+
 def get_python_version():
     version_info = sys.version_info
     version = f"{version_info.major}.{version_info.minor}.{version_info.micro}"
@@ -274,9 +432,12 @@ if __name__ == "__main__":
 
     python = get_python_version()
 
-    do_sleep_experiment(function=wait_cpu)
-    do_sleep_experiment(function=wait_sleep)
+    if False:
+        do_sleep_experiment(function=wait_cpu)
+        do_sleep_experiment(function=wait_sleep)
 
-    # check_add_numbers_performance()
+    if False:
+        do_prime_experiment()
 
-    # check_count_primes_performance()
+    if True:
+        do_prime_range_experiment()
