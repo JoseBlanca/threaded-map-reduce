@@ -4,16 +4,6 @@ import threading
 import queue
 import functools
 from pathlib import Path
-import time
-
-DO_PROFILING = False
-if DO_PROFILING:
-    try:
-        import yappi
-        # yappi is not thread safe
-    except ImportError:
-        print("yappi not installed, not doing profiling")
-        DO_PROFILING = False
 
 
 def _get_n_items(items, num_items):
@@ -101,18 +91,12 @@ def map_reduce_with_thread_pool(
     num_feeding_queues: int,
     num_items_per_chunk: int,
 ):
-    if DO_PROFILING:
-        yappi.set_clock_type("cpu")
-
     if num_feeding_queues > num_computing_threads:
         num_feeding_queues = num_computing_threads
 
     items = iter(iterable)
     chunks_queues = [queue.Queue() for _ in range(num_feeding_queues)]
     results_queue = queue.Queue()
-
-    if DO_PROFILING:
-        yappi.start()
 
     item_feeder_thread = threading.Thread(
         target=_feed_chunks,
@@ -140,25 +124,6 @@ def map_reduce_with_thread_pool(
     results = results.get_results()
 
     result = functools.reduce(reduce_fn, results)
-
-    if DO_PROFILING:
-        yappi.stop()
-        profiling_dir = (
-            Path(__name__).parent.parent.absolute() / "performance" / "profiling"
-        )
-        profiling_dir.mkdir(exist_ok=True)
-        for thread_stat in yappi.get_thread_stats():
-            print(thread_stat.name, thread_stat.id, thread_stat.ttot)
-            fpath = profiling_dir / f"thread_{thread_stat.name}_{thread_stat.id}.pstat"
-            yappi.get_func_stats(ctx_id=thread_stat.id).save(fpath, type="pstat")
-            fpath = (
-                profiling_dir / f"thread_{thread_stat.name}_{thread_stat.id}.callgrind"
-            )
-            yappi.get_func_stats(ctx_id=thread_stat.id).save(fpath, type="callgrind")
-        return result
-        threads = [item_feeder_thread] + computing_threads
-        for thread in threads:
-            print(f"Stats for {thread.name}")
 
     return result
 
