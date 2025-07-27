@@ -1,9 +1,8 @@
-from typing import Iterable
+from typing import Iterable, Iterator
 import itertools
 import threading
 import queue
 import functools
-from pathlib import Path
 
 
 def _get_n_items(items, num_items):
@@ -83,7 +82,17 @@ class _ComputingThreadsResults:
                 break
 
 
-def map_reduce_with_thread_pool(
+class ThreadSafeIterator(Iterator):
+    def __init__(self, it):
+        self._it = iter(it)
+        self._lock = threading.Lock()
+
+    def __next__(self):
+        with self._lock:
+            return next(self._it)
+
+
+def map_reduce_with_thread_pool_with_feeding_queues(
     map_fn,
     reduce_fn,
     iterable: Iterable,
@@ -128,4 +137,55 @@ def map_reduce_with_thread_pool(
     return result
 
 
-map_reduce = map_reduce_with_thread_pool
+def _map_reduce_chunks_from_iterator(chunks, results_queue, map_fn, reduce_fn):
+    chunk_results = (
+        functools.reduce(reduce_fn, map(map_fn, chunk)) for chunk in chunks
+    )
+    try:
+        result = functools.reduce(reduce_fn, chunk_results)
+    except TypeError as error:
+        if "empty iterable" in str(error):
+            result = UNUSED_THREAD
+        else:
+            raise
+
+    results_queue.put(result)
+
+
+def map_reduce_with_thread_pool_no_feeding_queue(
+    map_fn,
+    reduce_fn,
+    iterable: Iterable,
+    num_computing_threads: int,
+    num_items_per_chunk: int,
+):
+    chunks = _create_chunks(
+        iter(iterable),
+        num_items_per_chunk,
+    )
+    chunks = ThreadSafeIterator(chunks)
+    results_queue = queue.Queue()
+
+    map_reduce_items = functools.partial(
+        _map_reduce_chunks_from_iterator,
+        chunks=chunks,
+        map_fn=map_fn,
+        reduce_fn=reduce_fn,
+        results_queue=results_queue,
+    )
+
+    computing_threads = []
+    for idx in range(num_computing_threads):
+        thread = threading.Thread(target=map_reduce_items, name=f"comp_thread_{idx}")
+        thread.start()
+        computing_threads.append(thread)
+
+    results = _ComputingThreadsResults(results_queue, num_computing_threads)
+    results = results.get_results()
+
+    result = functools.reduce(reduce_fn, results)
+
+    return result
+
+
+map_reduce = map_reduce_with_thread_pool_no_feeding_queue

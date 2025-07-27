@@ -7,7 +7,10 @@ from time import time
 import matplotlib.pyplot as plt
 import numpy
 
-from threaded_map_reduce.threaded_map_reduce import map_reduce
+from threaded_map_reduce.threaded_map_reduce import (
+    map_reduce_with_thread_pool_with_feeding_queues,
+    map_reduce_with_thread_pool_no_feeding_queue,
+)
 
 
 def square(num):
@@ -58,14 +61,24 @@ def count_primes_threaded(
     numbers = range(1, num_numbers)
     start_time = time()
 
-    total = map_reduce(
-        is_prime,
-        add,
-        numbers,
-        num_computing_threads=num_computing_threads,
-        num_items_per_chunk=num_items_per_chunk,
-        num_feeding_queues=num_feeding_queues,
-    )
+    if num_feeding_queues:
+        total = map_reduce_with_thread_pool_with_feeding_queues(
+            is_prime,
+            add,
+            numbers,
+            num_computing_threads=num_computing_threads,
+            num_items_per_chunk=num_items_per_chunk,
+            num_feeding_queues=num_feeding_queues,
+        )
+    else:
+        total = map_reduce_with_thread_pool_no_feeding_queue(
+            is_prime,
+            add,
+            numbers,
+            num_computing_threads=num_computing_threads,
+            num_items_per_chunk=num_items_per_chunk,
+        )
+
     time_used = time() - start_time
     return {"time_used": time_used, "result": total}
 
@@ -179,7 +192,7 @@ def do_prime_experiment(
             color="blue",
         )
         axes.set_ylim(bottom=0, top=axes.get_ylim()[1])
-        axes.set_ylabel("Time (s)")
+        axes.set_ylabel("Efficiency")
         axes.set_xlabel("Num. threads")
         axes.set_title(
             f"n_items_chunk: {num_items_per_chunk}, n_feeding: {num_feeding_queues}, n_nums_to_check: {num_numbers_to_check}"
@@ -219,14 +232,23 @@ def check_count_primes_in_range_threaded(
         range_to_check = range(2, num_numbers_to_check)
         ranges_to_check = split_range(range_to_check, n_items_in_range)
         start_time = time()
-        res = map_reduce(
-            count_prime_numbers_in_range,
-            add,
-            ranges_to_check,
-            num_computing_threads=num_computing_threads,
-            num_items_per_chunk=num_items_per_chunk,
-            num_feeding_queues=num_feeding_queues,
-        )
+        if num_feeding_queues:
+            res = map_reduce_with_thread_pool_with_feeding_queues(
+                count_prime_numbers_in_range,
+                add,
+                ranges_to_check,
+                num_computing_threads=num_computing_threads,
+                num_items_per_chunk=num_items_per_chunk,
+                num_feeding_queues=num_feeding_queues,
+            )
+        else:
+            res = map_reduce_with_thread_pool_no_feeding_queue(
+                count_prime_numbers_in_range,
+                add,
+                ranges_to_check,
+                num_computing_threads=num_computing_threads,
+                num_items_per_chunk=num_items_per_chunk,
+            )
         end_time = time()
         times.append(end_time - start_time)
         results.append(res)
@@ -320,19 +342,18 @@ if __name__ == "__main__":
     charts_dir = performance_dir / "charts"
     charts_dir.mkdir(exist_ok=True)
 
-    if True:
-        num_numbers_to_check = 10000000
+    if False:
+        num_numbers_to_check = 1000000
         num_items_per_chunks = (1000, 1)
         num_threads = list(range(1, 17))
-        num_feeding_queues = 1
+        num_feeding_queues = 0
         do_prime_experiment(
             num_numbers_to_check, num_items_per_chunks, num_threads, num_feeding_queues
         )
 
-    if False:
+    if True:
         n_items_in_range = 10000
         num_items_per_chunks = (1, 20)
-        num_threads = list(range(1, 17))
         num_threads = list(range(1, 17))
         num_feeding_queues = 1
         do_prime_range_experiment(
