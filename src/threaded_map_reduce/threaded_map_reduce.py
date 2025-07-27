@@ -4,14 +4,16 @@ import threading
 import queue
 import functools
 from pathlib import Path
+import time
 
-DO_PROFILING = True
-try:
-    import yappi
-    # yappi is not thread safe
-except ImportError:
-    print("yappi not installed, not doing profiling")
-    DO_PROFILING = False
+DO_PROFILING = False
+if DO_PROFILING:
+    try:
+        import yappi
+        # yappi is not thread safe
+    except ImportError:
+        print("yappi not installed, not doing profiling")
+        DO_PROFILING = False
 
 
 def _get_n_items(items, num_items):
