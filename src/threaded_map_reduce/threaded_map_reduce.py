@@ -8,6 +8,7 @@ from pathlib import Path
 DO_PROFILING = True
 try:
     import yappi
+    # yappi is not thread safe
 except ImportError:
     print("yappi not installed, not doing profiling")
     DO_PROFILING = False
