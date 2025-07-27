@@ -2,6 +2,7 @@ from operator import add
 from functools import reduce
 from pathlib import Path
 import sys
+from time import time
 
 import matplotlib.pyplot as plt
 import numpy
@@ -109,13 +110,11 @@ def check_add_numbers_performance():
         )
 
 
-def check_count_primes_performance(numbers_to_check, num_items_per_chunk):
-    num_threadss = []
+def check_count_primes_performance(numbers_to_check, num_items_per_chunk, num_threadss):
     times_used = []
     results = []
-    for num_threads in range(1, 17):
+    for num_threads in num_threadss:
         res = count_primes_threaded(numbers_to_check, num_threads, num_items_per_chunk)
-        num_threadss.append(num_threads)
         times_used.append(res["time_used"])
         results.append(res["result"])
     return {
@@ -125,15 +124,14 @@ def check_count_primes_performance(numbers_to_check, num_items_per_chunk):
     }
 
 
-def do_prime_experiment():
-    num_numbers_to_check = 1000000
-    num_items_per_chunks = (100000, 10000, 1000, 100, 50, 1)
-
+def do_prime_experiment(num_numbers_to_check, num_items_per_chunks, num_threads):
     for num_items_per_chunk in num_items_per_chunks:
         non_threaded_result = count_primes_standard(num_numbers_to_check)
         print(non_threaded_result)
 
-        res = check_count_primes_performance(num_numbers_to_check, num_items_per_chunk)
+        res = check_count_primes_performance(
+            num_numbers_to_check, num_items_per_chunk, num_threads
+        )
         assert numpy.all(res["results"] == non_threaded_result["result"])
         print(res)
 
@@ -192,11 +190,14 @@ def count_primes_in_range_standard(ranges_to_check):
 
 
 def check_count_primes_in_range_threaded(
-    ranges_to_check, num_numbers_to_check, n_items_in_range, num_items_per_chunk
+    ranges_to_check,
+    num_numbers_to_check,
+    n_items_in_range,
+    num_items_per_chunk,
+    num_computing_threadss,
 ):
     times = []
     results = []
-    num_computing_threadss = list(range(1, 17))
     for num_computing_threads in num_computing_threadss:
         print("num threads", num_computing_threads)
         range_to_check = range(2, num_numbers_to_check)
@@ -223,9 +224,7 @@ def check_count_primes_in_range_threaded(
     }
 
 
-def do_prime_range_experiment():
-    n_items_in_range = 10000
-    num_items_per_chunks = (1, 100, 10)
+def do_prime_range_experiment(n_items_in_range, num_items_per_chunks, num_threads):
     num_ranges_total = max(num_items_per_chunks) * 16 * 2
     num_numbers_to_check = num_ranges_total * n_items_in_range
 
@@ -237,7 +236,11 @@ def do_prime_range_experiment():
         non_threaded_result = count_primes_in_range_standard(ranges_to_check)
 
         res = check_count_primes_in_range_threaded(
-            ranges_to_check, num_numbers_to_check, n_items_in_range, num_items_per_chunk
+            ranges_to_check,
+            num_numbers_to_check,
+            n_items_in_range,
+            num_items_per_chunk,
+            num_threads,
         )
         assert numpy.all(res["results"] == non_threaded_result["result"])
 
@@ -291,8 +294,16 @@ if __name__ == "__main__":
     charts_dir = performance_dir / "charts"
     charts_dir.mkdir(exist_ok=True)
 
-    if True:
-        do_prime_experiment()
-
     if False:
-        do_prime_range_experiment()
+        num_numbers_to_check = 10000000
+        num_items_per_chunks = (1000,)
+        num_threads = list(range(1, 17))
+        num_threads = [2, 6]
+        do_prime_experiment(num_numbers_to_check, num_items_per_chunks, num_threads)
+
+    if True:
+        n_items_in_range = 10000
+        num_items_per_chunks = (1, 20)
+        num_threads = list(range(1, 17))
+        num_threads = [2, 6]
+        do_prime_range_experiment(n_items_in_range, num_items_per_chunks, num_threads)
