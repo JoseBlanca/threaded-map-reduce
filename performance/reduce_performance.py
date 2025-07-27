@@ -52,7 +52,9 @@ def count_primes_standard(num_numbers):
     return {"time_used": time_used, "result": total}
 
 
-def count_primes_threaded(num_numbers, num_computing_threads, num_items_per_chunk):
+def count_primes_threaded(
+    num_numbers, num_computing_threads, num_items_per_chunk, num_feeding_queues
+):
     numbers = range(1, num_numbers)
     start_time = time()
 
@@ -62,6 +64,7 @@ def count_primes_threaded(num_numbers, num_computing_threads, num_items_per_chun
         numbers,
         num_computing_threads=num_computing_threads,
         num_items_per_chunk=num_items_per_chunk,
+        num_feeding_queues=num_feeding_queues,
     )
     time_used = time() - start_time
     return {"time_used": time_used, "result": total}
@@ -110,11 +113,15 @@ def check_add_numbers_performance():
         )
 
 
-def check_count_primes_performance(numbers_to_check, num_items_per_chunk, num_threadss):
+def check_count_primes_performance(
+    numbers_to_check, num_items_per_chunk, num_threadss, num_feeding_queues
+):
     times_used = []
     results = []
     for num_threads in num_threadss:
-        res = count_primes_threaded(numbers_to_check, num_threads, num_items_per_chunk)
+        res = count_primes_threaded(
+            numbers_to_check, num_threads, num_items_per_chunk, num_feeding_queues
+        )
         times_used.append(res["time_used"])
         results.append(res["result"])
     return {
@@ -124,20 +131,22 @@ def check_count_primes_performance(numbers_to_check, num_items_per_chunk, num_th
     }
 
 
-def do_prime_experiment(num_numbers_to_check, num_items_per_chunks, num_threads):
+def do_prime_experiment(
+    num_numbers_to_check, num_items_per_chunks, num_threads, num_feeding_queues
+):
     for num_items_per_chunk in num_items_per_chunks:
         non_threaded_result = count_primes_standard(num_numbers_to_check)
         print(non_threaded_result)
 
         res = check_count_primes_performance(
-            num_numbers_to_check, num_items_per_chunk, num_threads
+            num_numbers_to_check, num_items_per_chunk, num_threads, num_feeding_queues
         )
         assert numpy.all(res["results"] == non_threaded_result["result"])
         print(res)
 
         plot_path = (
             charts_dir
-            / f"primes.{get_python_version()}.num_numbers_to_check_{num_numbers_to_check}.num_items_per_chunk_{num_items_per_chunk}.time.png"
+            / f"primes.{get_python_version()}.num_numbers_to_check_{num_numbers_to_check}.num_items_per_chunk_{num_items_per_chunk}.n_feeding_{num_feeding_queues}.time.png"
         )
         fig, axes = plt.subplots()
         axes.plot(
@@ -150,13 +159,16 @@ def do_prime_experiment(num_numbers_to_check, num_items_per_chunks, num_threads)
         axes.set_ylim(bottom=0, top=axes.get_ylim()[1])
         axes.set_ylabel("Time (s)")
         axes.set_xlabel("Num. threads")
+        axes.set_title(
+            f"n_items_chunk: {num_items_per_chunk}, n_feeding: {num_feeding_queues}, n_nums_to_check: {num_numbers_to_check}"
+        )
         fig.savefig(str(plot_path))
 
         speedup = res["times_used"][0] / res["times_used"]
         efficiency = speedup / res["n_threads"]
         plot_path = (
             charts_dir
-            / f"primes.{get_python_version()}.num_numbers_to_check_{num_numbers_to_check}.num_items_per_chunk_{num_items_per_chunk}.efficiency.png"
+            / f"primes.{get_python_version()}.num_numbers_to_check_{num_numbers_to_check}.num_items_per_chunk_{num_items_per_chunk}.n_feeding_{num_feeding_queues}.efficiency.png"
         )
         fig, axes = plt.subplots()
         axes.plot(
@@ -169,6 +181,9 @@ def do_prime_experiment(num_numbers_to_check, num_items_per_chunks, num_threads)
         axes.set_ylim(bottom=0, top=axes.get_ylim()[1])
         axes.set_ylabel("Time (s)")
         axes.set_xlabel("Num. threads")
+        axes.set_title(
+            f"n_items_chunk: {num_items_per_chunk}, n_feeding: {num_feeding_queues}, n_nums_to_check: {num_numbers_to_check}"
+        )
         fig.savefig(str(plot_path))
 
 
@@ -195,6 +210,7 @@ def check_count_primes_in_range_threaded(
     n_items_in_range,
     num_items_per_chunk,
     num_computing_threadss,
+    num_feeding_queues,
 ):
     times = []
     results = []
@@ -209,6 +225,7 @@ def check_count_primes_in_range_threaded(
             ranges_to_check,
             num_computing_threads=num_computing_threads,
             num_items_per_chunk=num_items_per_chunk,
+            num_feeding_queues=num_feeding_queues,
         )
         end_time = time()
         times.append(end_time - start_time)
@@ -224,7 +241,9 @@ def check_count_primes_in_range_threaded(
     }
 
 
-def do_prime_range_experiment(n_items_in_range, num_items_per_chunks, num_threads):
+def do_prime_range_experiment(
+    n_items_in_range, num_items_per_chunks, num_threads, num_feeding_queues
+):
     num_ranges_total = max(num_items_per_chunks) * 16 * 2
     num_numbers_to_check = num_ranges_total * n_items_in_range
 
@@ -241,12 +260,13 @@ def do_prime_range_experiment(n_items_in_range, num_items_per_chunks, num_thread
             n_items_in_range,
             num_items_per_chunk,
             num_threads,
+            num_feeding_queues,
         )
         assert numpy.all(res["results"] == non_threaded_result["result"])
 
         plot_path = (
             charts_dir
-            / f"{experiment_name}.{get_python_version()}.n_numbers_to_check_{num_numbers_to_check}.n_items_in_range_{n_items_in_range}.n_items_per_chunk_{num_items_per_chunk}.time.png"
+            / f"{experiment_name}.{get_python_version()}.n_numbers_to_check_{num_items_per_chunk}.n_items_in_range_{n_items_in_range}.n_items_per_chunk_{num_items_per_chunk}.n_feeding_queues.{num_feeding_queues}.time.png"
         )
         fig, axes = plt.subplots()
         axes.plot(
@@ -259,13 +279,16 @@ def do_prime_range_experiment(n_items_in_range, num_items_per_chunks, num_thread
         axes.set_ylim(bottom=0, top=axes.get_ylim()[1])
         axes.set_ylabel("Time (s)")
         axes.set_xlabel("Num. threads")
+        axes.set_title(
+            f"N. feeders: {num_feeding_queues}, N. items chunk: {num_items_per_chunk}, N. nums to check: {num_numbers_to_check}"
+        )
         fig.savefig(str(plot_path))
 
         speedup = res["times_used"][0] / res["times_used"]
         efficiency = speedup / res["n_threads"]
         plot_path = (
             charts_dir
-            / f"{experiment_name}.{get_python_version()}.n_numbers_to_check_{num_numbers_to_check}.n_items_in_range_{n_items_in_range}.n_items_per_chunk_{num_items_per_chunk}.efficiency.png"
+            / f"{experiment_name}.{get_python_version()}.n_numbers_to_check_{num_numbers_to_check}.n_items_in_range_{n_items_in_range}.n_items_per_chunk_{num_items_per_chunk}.n_feeding_queues.{num_feeding_queues}.efficiency.png"
         )
         fig, axes = plt.subplots()
         axes.plot(
@@ -278,6 +301,9 @@ def do_prime_range_experiment(n_items_in_range, num_items_per_chunks, num_thread
         axes.set_ylim(bottom=0, top=axes.get_ylim()[1])
         axes.set_ylabel("Efficiency")
         axes.set_xlabel("Num. threads")
+        axes.set_title(
+            f"N. feeders: {num_feeding_queues}, N. items chunk: {num_items_per_chunk}, N. nums to check: {num_numbers_to_check}"
+        )
         fig.savefig(str(plot_path))
 
 
@@ -294,16 +320,21 @@ if __name__ == "__main__":
     charts_dir = performance_dir / "charts"
     charts_dir.mkdir(exist_ok=True)
 
-    if False:
-        num_numbers_to_check = 10000000
-        num_items_per_chunks = (1000,)
-        num_threads = list(range(1, 17))
-        num_threads = [2, 6]
-        do_prime_experiment(num_numbers_to_check, num_items_per_chunks, num_threads)
-
     if True:
+        num_numbers_to_check = 10000000
+        num_items_per_chunks = (1000, 1)
+        num_threads = list(range(1, 17))
+        num_feeding_queues = 1
+        do_prime_experiment(
+            num_numbers_to_check, num_items_per_chunks, num_threads, num_feeding_queues
+        )
+
+    if False:
         n_items_in_range = 10000
         num_items_per_chunks = (1, 20)
         num_threads = list(range(1, 17))
-        num_threads = [2, 6]
-        do_prime_range_experiment(n_items_in_range, num_items_per_chunks, num_threads)
+        num_threads = list(range(1, 17))
+        num_feeding_queues = 1
+        do_prime_range_experiment(
+            n_items_in_range, num_items_per_chunks, num_threads, num_feeding_queues
+        )

@@ -62,13 +62,15 @@ def _map_reduce_items_from_queue(chunks_queue, results_queue, map_fn, reduce_fn)
     results_queue.put(result)
 
 
-def _feed_chunks(items, num_items_per_chunk, chunks_queue):
+def _feed_chunks(items, num_items_per_chunk, chunks_queues):
+    chunks_queues_cycle = itertools.cycle(chunks_queues)
     for chunk in _create_chunks(
         items,
         num_items_per_chunk,
     ):
-        chunks_queue.put(chunk)
-    chunks_queue.shutdown()
+        next(chunks_queues_cycle).put(chunk)
+    for chunks_queue in chunks_queues:
+        chunks_queue.shutdown()
 
 
 class _ComputingThreadsResults:
@@ -96,34 +98,40 @@ def map_reduce_with_thread_pool(
     reduce_fn,
     iterable: Iterable,
     num_computing_threads: int,
+    num_feeding_queues: int,
     num_items_per_chunk: int,
 ):
     if DO_PROFILING:
         yappi.set_clock_type("cpu")
 
+    if num_feeding_queues > num_computing_threads:
+        num_feeding_queues = num_computing_threads
+
     items = iter(iterable)
-    chunks_queue = queue.Queue()
+    chunks_queues = [queue.Queue() for _ in range(num_feeding_queues)]
     results_queue = queue.Queue()
-    map_reduce_items = functools.partial(
-        _map_reduce_items_from_queue,
-        map_fn=map_fn,
-        reduce_fn=reduce_fn,
-        chunks_queue=chunks_queue,
-        results_queue=results_queue,
-    )
 
     if DO_PROFILING:
         yappi.start()
 
     item_feeder_thread = threading.Thread(
         target=_feed_chunks,
-        args=(items, num_items_per_chunk, chunks_queue),
+        args=(items, num_items_per_chunk, chunks_queues),
         name="feeder_thread",
     )
     item_feeder_thread.start()
 
     computing_threads = []
+    chunks_queues_cycle = itertools.cycle(chunks_queues)
     for idx in range(num_computing_threads):
+        map_reduce_items = functools.partial(
+            _map_reduce_items_from_queue,
+            map_fn=map_fn,
+            reduce_fn=reduce_fn,
+            chunks_queue=next(chunks_queues_cycle),
+            results_queue=results_queue,
+        )
+
         thread = threading.Thread(target=map_reduce_items, name=f"comp_thread_{idx}")
         thread.start()
         computing_threads.append(thread)
