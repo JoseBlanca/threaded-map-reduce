@@ -69,16 +69,16 @@ def count_primes_threaded(
 
     funct_name = map_reduce_funct.__name__
 
-    if funct_name == "map_reduce_with_thread_pool_and_buffers":
-        total = map_reduce_with_thread_pool_and_buffers(
+    if funct_name == "_map_reduce_with_thread_pool_and_buffers":
+        total = _map_reduce_with_thread_pool_and_buffers(
             is_prime,
             add,
             numbers,
             num_computing_threads=num_computing_threads,
             buffer_size=num_items_per_chunk,
         )
-    elif num_feeding_queues:
-        total = map_reduce_with_thread_pool_with_feeding_queues(
+    elif funct_name == "_map_reduce_with_thread_pool_with_feeding_queues":
+        total = _map_reduce_with_thread_pool_with_feeding_queues(
             is_prime,
             add,
             numbers,
@@ -86,14 +86,23 @@ def count_primes_threaded(
             num_items_per_chunk=num_items_per_chunk,
             num_feeding_queues=num_feeding_queues,
         )
-    else:
-        total = map_reduce_with_thread_pool_no_feeding_queue(
+    elif funct_name == "_map_reduce_with_thread_pool_no_feeding_queue":
+        total = _map_reduce_with_thread_pool_no_feeding_queue(
             is_prime,
             add,
             numbers,
             num_computing_threads=num_computing_threads,
             num_items_per_chunk=num_items_per_chunk,
         )
+    elif funct_name == "_map_reduce_naive":
+        total = _map_reduce_naive(
+            is_prime,
+            add,
+            numbers,
+            num_computing_threads=num_computing_threads,
+        )
+    else:
+        raise ValueError(f"Unknown map-reduce function: {funct_name}")
 
     time_used = time() - start_time
     return {"time_used": time_used, "result": total}
@@ -202,7 +211,10 @@ def do_prime_experiment(
         print(res)
 
         base_fname = f"primes.{get_python_version()}.num_numbers_to_check_{num_numbers_to_check}.{experiment_name}"
-        if experiment_name in ("with_buffers", "no_feeding_queue"):
+        if experiment_name == "with_buffers":
+            title = f"nums. checked: {num_numbers_to_check}, buffer_size: {num_items_per_chunk}"
+            base_fname += f".buffer_size_{num_items_per_chunk}"
+        elif experiment_name in "no_feeding_queue":
             title = f"nums. checked: {num_numbers_to_check}, chunk_size: {num_items_per_chunk}"
             base_fname += f".num_items_per_chunk_{num_items_per_chunk}"
         elif experiment_name == "with_feeding_queues":
@@ -222,11 +234,21 @@ def do_prime_experiment(
             linestyle="-",
             marker="o",
             color="blue",
+            label="threaded",
+        )
+        xmin, xmax = axes.get_xlim()
+        axes.hlines(
+            non_threaded_result["time_used"],
+            xmin=xmin,
+            xmax=xmax,
+            color="red",
+            label="non_threaded",
         )
         axes.set_ylim(bottom=0, top=axes.get_ylim()[1])
         axes.set_ylabel("Time (s)")
         axes.set_xlabel("Num. threads")
         axes.set_title(title)
+        axes.legend()
         fig.savefig(str(plot_path))
 
         speedup = res["times_used"][0] / res["times_used"]
@@ -390,11 +412,10 @@ if __name__ == "__main__":
     charts_dir.mkdir(exist_ok=True)
     map_reduce_funct = _map_reduce_with_thread_pool_and_buffers
     # map_reduce_funct = _map_reduce_with_thread_pool_no_feeding_queue
-    map_reduce_funct = _map_reduce_naive
+    # map_reduce_funct = _map_reduce_naive
 
     if True:
         num_numbers_to_check = 1000000
-        num_numbers_to_check = 100000
         num_items_per_chunks = (1000, 100, 1)
         num_threads = list(range(1, 17))
         num_feeding_queues = 0
