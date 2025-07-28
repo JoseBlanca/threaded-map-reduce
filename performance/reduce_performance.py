@@ -8,9 +8,9 @@ import matplotlib.pyplot as plt
 import numpy
 
 from threaded_map_reduce.threaded_map_reduce import (
-    map_reduce_with_thread_pool_with_feeding_queues,
-    map_reduce_with_thread_pool_no_feeding_queue,
-    map_reduce_with_thread_pool_and_buffers,
+    _map_reduce_with_thread_pool_with_feeding_queues,
+    _map_reduce_with_thread_pool_no_feeding_queue,
+    _map_reduce_with_thread_pool_and_buffers,
     _map_reduce_naive,
 )
 
@@ -176,11 +176,11 @@ def do_prime_experiment(
     map_reduce_funct,
 ):
     funct_name = map_reduce_funct.__name__
-    if funct_name == "map_reduce_with_thread_pool_and_buffers":
+    if funct_name == "_map_reduce_with_thread_pool_and_buffers":
         experiment_name = "with_buffers"
-    elif funct_name == "map_reduce_with_thread_pool_no_feeding_queue":
+    elif funct_name == "_map_reduce_with_thread_pool_no_feeding_queue":
         experiment_name = "no_feeding_queue"
-    elif funct_name == "map_reduce_with_thread_pool_with_feeding_queues":
+    elif funct_name == "_map_reduce_with_thread_pool_with_feeding_queues":
         experiment_name = "with_feeding_queues"
     elif funct_name == "_map_reduce_naive":
         experiment_name = "naive"
@@ -388,8 +388,8 @@ if __name__ == "__main__":
     performance_dir = Path(__file__).parent
     charts_dir = performance_dir / "charts"
     charts_dir.mkdir(exist_ok=True)
-    map_reduce_funct = map_reduce_with_thread_pool_and_buffers
-    # map_reduce_funct = map_reduce_with_thread_pool_no_feeding_queue
+    map_reduce_funct = _map_reduce_with_thread_pool_and_buffers
+    # map_reduce_funct = _map_reduce_with_thread_pool_no_feeding_queue
     map_reduce_funct = _map_reduce_naive
 
     if True:

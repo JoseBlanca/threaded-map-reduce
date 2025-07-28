@@ -92,7 +92,7 @@ class ThreadSafeIterator(Iterator):
             return next(self._it)
 
 
-def map_reduce_with_thread_pool_with_feeding_queues(
+def _map_reduce_with_thread_pool_with_feeding_queues(
     map_fn,
     reduce_fn,
     iterable: Iterable,
@@ -152,7 +152,7 @@ def _map_reduce_chunks_from_iterator(chunks, results_queue, map_fn, reduce_fn):
     results_queue.put(result)
 
 
-def map_reduce_with_thread_pool_no_feeding_queue(
+def _map_reduce_with_thread_pool_no_feeding_queue(
     map_fn,
     reduce_fn,
     iterable: Iterable,
@@ -224,7 +224,7 @@ def _map_reduce_chunks_from_chunk_dispenser(
     results_queue.put(result)
 
 
-def map_reduce_with_thread_pool_and_buffers(
+def _map_reduce_with_thread_pool_and_buffers(
     map_fn,
     reduce_fn,
     iterable: Iterable,
@@ -302,4 +302,7 @@ def _map_reduce_naive(
     return result
 
 
-map_reduce = map_reduce_with_thread_pool_and_buffers
+map_reduce = _map_reduce_with_thread_pool_with_feeding_queues
+map_reduce = _map_reduce_with_thread_pool_no_feeding_queue
+map_reduce = _map_reduce_naive
+map_reduce = _map_reduce_with_thread_pool_and_buffers
