@@ -7,10 +7,7 @@ authors = [
     { name = "Jose Blanca", email = "jblanca@upv.es" }
 ]
 requires-python = ">=3.13"
-dependencies = [
-    "matplotlib>=3.10.3",
-    "numpy>=2.3.1",
-]
+dependencies = []
 
 [build-system]
 requires = ["hatchling"]
@@ -19,4 +16,6 @@ build-backend = "hatchling.build"
 [dependency-groups]
 dev = [
     "pytest>=8.4.1",
+    "matplotlib>=3.10.3",
+    "numpy>=2.3.1",
 ]
