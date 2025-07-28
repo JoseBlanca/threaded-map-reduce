@@ -7,11 +7,15 @@ from time import time
 import matplotlib.pyplot as plt
 import numpy
 
-from threaded_map_reduce.threaded_map_reduce import (
+from threaded_map_reduce.old_implementations import (
     _map_reduce_with_thread_pool_with_feeding_queues,
     _map_reduce_with_thread_pool_no_feeding_queue,
-    _map_reduce_with_thread_pool_and_buffers,
     _map_reduce_naive,
+)
+
+
+from threaded_map_reduce.threaded_map_reduce import (
+    _map_reduce_with_thread_pool_and_buffers,
 )
 
 
