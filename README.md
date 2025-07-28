@@ -55,7 +55,7 @@ def map_reduce(
 **Important Notes:**
 - `reduce_fn` must be associative (order of operations shouldn't matter)
 
-Of course, all this makes sense when the experimental free-threaded Python is used. If you use the standard Python adding extra threads to a CPU bound task would be, at best, useless.
+Of course, all this makes sense only when the experimental free-threaded Python is used. If you use the standard Python adding extra threads to a CPU bound task would be, at best, useless.
 I have used the 3.13.5t Python provided by [uv](https://docs.astral.sh/uv/guides/install-python/).
 
 ## Performance
