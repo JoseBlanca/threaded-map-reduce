@@ -1,2 +1,1 @@
-def main() -> None:
-    print("Hello from split-gvcf!")
+from threaded_map_reduce.threaded_map_reduce import map_reduce
