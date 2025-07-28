@@ -258,4 +258,48 @@ def map_reduce_with_thread_pool_and_buffers(
     return result
 
 
+def _map_reduce_items(items, results_queue, map_fn, reduce_fn):
+    try:
+        result = functools.reduce(reduce_fn, map(map_fn, items))
+    except TypeError as error:
+        if "empty iterable" in str(error):
+            result = UNUSED_THREAD
+        else:
+            raise
+
+    results_queue.put(result)
+
+
+def _map_reduce_naive(
+    map_fn,
+    reduce_fn,
+    iterable: Iterable,
+    num_computing_threads: int,
+):
+    items = ThreadSafeIterator(iterable)
+
+    results_queue = queue.Queue()
+
+    map_reduce_items = functools.partial(
+        _map_reduce_items,
+        items=items,
+        map_fn=map_fn,
+        reduce_fn=reduce_fn,
+        results_queue=results_queue,
+    )
+
+    computing_threads = []
+    for idx in range(num_computing_threads):
+        thread = threading.Thread(target=map_reduce_items, name=f"comp_thread_{idx}")
+        thread.start()
+        computing_threads.append(thread)
+
+    results = _ComputingThreadsResults(results_queue, num_computing_threads)
+    results = results.get_results()
+
+    result = functools.reduce(reduce_fn, results)
+
+    return result
+
+
 map_reduce = map_reduce_with_thread_pool_and_buffers

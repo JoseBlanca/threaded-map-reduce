@@ -11,6 +11,7 @@ from threaded_map_reduce.threaded_map_reduce import (
     map_reduce_with_thread_pool_with_feeding_queues,
     map_reduce_with_thread_pool_no_feeding_queue,
     map_reduce_with_thread_pool_and_buffers,
+    _map_reduce_naive,
 )
 
 
@@ -181,6 +182,8 @@ def do_prime_experiment(
         experiment_name = "no_feeding_queue"
     elif funct_name == "map_reduce_with_thread_pool_with_feeding_queues":
         experiment_name = "with_feeding_queues"
+    elif funct_name == "_map_reduce_naive":
+        experiment_name = "naive"
     else:
         experiment_name = "other_experiment"
 
@@ -205,6 +208,8 @@ def do_prime_experiment(
         elif experiment_name == "with_feeding_queues":
             title = f"nums. checked: {num_numbers_to_check}, chunk_size: {num_items_per_chunk}, n_feeding_queues: {num_feeding_queues}"
             base_fname += f".num_items_per_chunk_{num_items_per_chunk}.n_feeding_{num_feeding_queues}"
+        elif experiment_name == "naive":
+            title = f"nums. checked: {num_numbers_to_check}"
         else:
             title = f"nums. checked: {num_numbers_to_check}"
 
@@ -385,6 +390,7 @@ if __name__ == "__main__":
     charts_dir.mkdir(exist_ok=True)
     map_reduce_funct = map_reduce_with_thread_pool_and_buffers
     # map_reduce_funct = map_reduce_with_thread_pool_no_feeding_queue
+    map_reduce_funct = _map_reduce_naive
 
     if True:
         num_numbers_to_check = 1000000
