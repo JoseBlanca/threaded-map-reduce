@@ -1,16 +1,7 @@
 from operator import add
 from functools import reduce as funct_reduce
 
-from threaded_map_reduce.threaded_map_reduce import map_reduce, reduce
-
-
-def test_reduce():
-    num_items_gauss_added = 101
-    nums = range(num_items_gauss_added)
-    result1 = funct_reduce(add, nums)
-    nums = range(num_items_gauss_added)
-    result2 = reduce(add, nums, max_workers=4)
-    assert result1 == result2
+from threaded_map_reduce import map_reduce
 
 
 def square(a):
@@ -23,5 +14,5 @@ def test_map_reduce():
     squares = map(square, nums)
     result1 = funct_reduce(add, squares)
     nums = range(num_items)
-    result2 = map_reduce(square, add, nums, max_workers=4)
+    result2 = map_reduce(square, add, nums, num_computing_threads=4, buffer_size=10)
     assert result1 == result2
