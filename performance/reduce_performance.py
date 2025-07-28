@@ -236,6 +236,15 @@ def do_prime_experiment(
             color="blue",
             label="threaded",
         )
+        ideal_times = non_threaded_result["time_used"] / res["n_threads"]
+        axes.plot(
+            res["n_threads"],
+            ideal_times,
+            linestyle="-",
+            marker="o",
+            color="grey",
+            label="ideal",
+        )
         xmin, xmax = axes.get_xlim()
         axes.hlines(
             non_threaded_result["time_used"],
@@ -251,7 +260,7 @@ def do_prime_experiment(
         axes.legend()
         fig.savefig(str(plot_path))
 
-        speedup = res["times_used"][0] / res["times_used"]
+        speedup = non_threaded_result["time_used"] / res["times_used"]
         efficiency = speedup / res["n_threads"]
         plot_path = charts_dir / f"{base_fname}.efficiency.png"
         fig, axes = plt.subplots()
@@ -410,15 +419,16 @@ if __name__ == "__main__":
     performance_dir = Path(__file__).parent
     charts_dir = performance_dir / "charts"
     charts_dir.mkdir(exist_ok=True)
-    map_reduce_funct = _map_reduce_with_thread_pool_and_buffers
+    # map_reduce_funct = _map_reduce_with_thread_pool_and_buffers
     # map_reduce_funct = _map_reduce_with_thread_pool_no_feeding_queue
     # map_reduce_funct = _map_reduce_naive
+    map_reduce_funct = _map_reduce_with_thread_pool_with_feeding_queues
 
     if True:
         num_numbers_to_check = 1000000
         num_items_per_chunks = (1000, 100, 1)
         num_threads = list(range(1, 17))
-        num_feeding_queues = 0
+        num_feeding_queues = 1
         do_prime_experiment(
             num_numbers_to_check,
             num_items_per_chunks,
