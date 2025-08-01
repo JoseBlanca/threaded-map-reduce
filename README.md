@@ -95,6 +95,21 @@ Note that it makes total sense to use threads with the old non-free-threaded-[GI
 If the tasks are most of the time just waiting, it makes sense to have several tasks being processed in parallel by different threads. In that way, as soon as one I/O wait is completed, the corresponding task would be done.
 Otherwise every task would have to wait in line, and that's not a good idea.
 
+## The GIL strikes back
+
+Beware that even when you're using a free-threaded Python the GIL might be enabled.
+For instance, it is comon for the GIL to be reaquired when a compiled library is imported.
+When a non-Python library is loaded, by default Python assumes that it is not thread-safe and it reaquires the GIL.
+For instance, this happens when to load the gzip module in Python 3.13 or when you import pandas 2.3.1.
+Sometimes, although not always you'll get a warning.
+
+```
+$ uv run --python 3.13.5t  performance/reduce_performance.py 
+<frozen importlib._bootstrap>:488: RuntimeWarning: The global interpreter lock (GIL) has been enabled to load module 'pandas._libs.pandas_parser', which has not declared that it can run safely without the GIL. To override this behavior and keep the GIL disabled (at your own risk), run with PYTHON_GIL=0 or -Xgil=0.
+```
+
+If you see that you're multithreaded application is running with the computation power of just one core, this might be what is going on, and it is a hard problem, a problem that has wreck my plans more than once.
+
 ## The journey
 
 The current implementation is not the first one that I tried.
