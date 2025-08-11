@@ -12,6 +12,10 @@ from threaded_map_reduce.old_implementations import (
     _map_reduce_with_thread_pool_no_feeding_queue,
     _map_reduce_naive,
 )
+from threaded_map_reduce.futures_map_reduce import (
+    map_reduce_with_executor,
+    map_reduce_with_executor_naive,
+)
 
 
 from threaded_map_reduce.threaded_map_reduce import (
@@ -105,6 +109,23 @@ def count_primes_threaded(
             numbers,
             num_computing_threads=num_computing_threads,
         )
+    elif funct_name == "map_reduce_with_executor":
+        total = map_reduce_with_executor(
+            is_prime,
+            add,
+            numbers,
+            max_workers=num_computing_threads,
+            initial_reduce_value=0,
+            num_items_per_chunk=num_items_per_chunk,
+        )
+    elif funct_name == "map_reduce_with_executor_naive":
+        total = map_reduce_with_executor_naive(
+            is_prime,
+            add,
+            numbers,
+            max_workers=num_computing_threads,
+            initial_reduce_value=0,
+        )
     else:
         raise ValueError(f"Unknown map-reduce function: {funct_name}")
 
@@ -197,6 +218,10 @@ def do_prime_experiment(
         experiment_name = "with_feeding_queues"
     elif funct_name == "_map_reduce_naive":
         experiment_name = "naive"
+    elif funct_name == "map_reduce_with_executor":
+        experiment_name = "executor"
+    elif funct_name == "map_reduce_with_executor_naive":
+        experiment_name = "executor_naive"
     else:
         experiment_name = "other_experiment"
 
@@ -225,6 +250,11 @@ def do_prime_experiment(
             title = f"nums. checked: {num_numbers_to_check}, chunk_size: {num_items_per_chunk}, n_feeding_queues: {num_feeding_queues}"
             base_fname += f".num_items_per_chunk_{num_items_per_chunk}.n_feeding_{num_feeding_queues}"
         elif experiment_name == "naive":
+            title = f"nums. checked: {num_numbers_to_check}"
+        elif experiment_name == "executor":
+            title = f"nums. checked: {num_numbers_to_check}, chunk_size: {num_items_per_chunk}"
+            base_fname += f".num_items_per_chunk_{num_items_per_chunk}"
+        elif experiment_name == "executor_naive":
             title = f"nums. checked: {num_numbers_to_check}"
         else:
             title = f"nums. checked: {num_numbers_to_check}"
@@ -427,6 +457,8 @@ if __name__ == "__main__":
     # map_reduce_funct = _map_reduce_with_thread_pool_no_feeding_queue
     # map_reduce_funct = _map_reduce_naive
     map_reduce_funct = _map_reduce_with_thread_pool_with_feeding_queues
+    map_reduce_funct = map_reduce_with_executor_naive
+    # map_reduce_funct = map_reduce_with_executor
 
     if True:
         num_numbers_to_check = 1000000
