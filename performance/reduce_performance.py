@@ -1,30 +1,19 @@
+from time import time
+from functools import reduce, partial
 from operator import add
-from functools import reduce
 from pathlib import Path
 import sys
-from time import time
 
-import matplotlib.pyplot as plt
 import numpy
+import matplotlib.pyplot as plt
 
-from threaded_map_reduce.old_implementations import (
-    _map_reduce_with_thread_pool_with_feeding_queues,
-    _map_reduce_with_thread_pool_no_feeding_queue,
-    _map_reduce_naive,
+from threaded_map_reduce import map_reduce as map_reduce_with_thread_pool_and_buffers
+from other_implementations import (
+    map_reduce_naive,
+    map_reduce_with_thread_pool_no_feeding_queue,
+    map_reduce_with_thread_pool_with_feeding_queues,
 )
-from threaded_map_reduce.futures_map_reduce import (
-    map_reduce_with_executor,
-    map_reduce_with_executor_naive,
-)
-
-
-from threaded_map_reduce.threaded_map_reduce import (
-    _map_reduce_with_thread_pool_and_buffers,
-)
-
-
-def square(num):
-    return num**2
+from futures_map_reduce import map_reduce_with_executor, map_reduce_with_executor_naive
 
 
 def is_prime(n):
@@ -51,394 +40,99 @@ def is_prime(n):
     return True
 
 
-def count_prime_numbers_in_range(range_):
-    return sum(is_prime(num) for num in range_)
-
-
-def count_primes_standard(num_numbers):
+def count_primes_non_threaded(num_numbers):
     numbers = range(1, num_numbers)
     start_time = time()
 
     total = reduce(add, map(is_prime, numbers))
 
     time_used = time() - start_time
-    return {"time_used": time_used, "result": total}
+    return {"time": time_used, "result": total}
 
 
 def count_primes_threaded(
     num_numbers,
-    num_computing_threads,
-    num_items_per_chunk,
-    num_feeding_queues,
     map_reduce_funct,
 ):
     numbers = range(1, num_numbers)
     start_time = time()
-
-    funct_name = map_reduce_funct.__name__
-
-    if funct_name == "_map_reduce_with_thread_pool_and_buffers":
-        total = _map_reduce_with_thread_pool_and_buffers(
-            is_prime,
-            add,
-            numbers,
-            num_computing_threads=num_computing_threads,
-            buffer_size=num_items_per_chunk,
-        )
-    elif funct_name == "_map_reduce_with_thread_pool_with_feeding_queues":
-        total = _map_reduce_with_thread_pool_with_feeding_queues(
-            is_prime,
-            add,
-            numbers,
-            num_computing_threads=num_computing_threads,
-            num_items_per_chunk=num_items_per_chunk,
-            num_feeding_queues=num_feeding_queues,
-        )
-    elif funct_name == "_map_reduce_with_thread_pool_no_feeding_queue":
-        total = _map_reduce_with_thread_pool_no_feeding_queue(
-            is_prime,
-            add,
-            numbers,
-            num_computing_threads=num_computing_threads,
-            num_items_per_chunk=num_items_per_chunk,
-        )
-    elif funct_name == "_map_reduce_naive":
-        total = _map_reduce_naive(
-            is_prime,
-            add,
-            numbers,
-            num_computing_threads=num_computing_threads,
-        )
-    elif funct_name == "map_reduce_with_executor":
-        total = map_reduce_with_executor(
-            is_prime,
-            add,
-            numbers,
-            max_workers=num_computing_threads,
-            initial_reduce_value=0,
-            num_items_per_chunk=num_items_per_chunk,
-        )
-    elif funct_name == "map_reduce_with_executor_naive":
-        total = map_reduce_with_executor_naive(
-            is_prime,
-            add,
-            numbers,
-            max_workers=num_computing_threads,
-            initial_reduce_value=0,
-        )
-    else:
-        raise ValueError(f"Unknown map-reduce function: {funct_name}")
-
-    time_used = time() - start_time
-    return {"time_used": time_used, "result": total}
-
-
-def add_squares_standard(num_numbers_to_add):
-    numbers = range(num_numbers_to_add)
-    start_time = time()
-
-    total = reduce(add, map(square, numbers))
-
-    time_used = time() - start_time
-    return {"time_used": time_used, "result": total}
-
-
-def add_squares_threaded(
-    num_numbers_to_add, num_computing_threads, num_items_per_chunk
-):
-    numbers = range(num_numbers_to_add)
-    start_time = time()
-
-    total = map_reduce(
-        square,
+    total = map_reduce_funct(
+        is_prime,
         add,
         numbers,
-        num_computing_threads=num_computing_threads,
-        num_items_per_chunk=num_items_per_chunk,
     )
-
     time_used = time() - start_time
     return {"time_used": time_used, "result": total}
-
-
-def check_add_numbers_performance():
-    numbers_to_add = 20000000
-    res = add_squares_standard(numbers_to_add)
-    print("standard: ", res["time_used"], res["result"])
-    for num_items in range(50, 450, 50):
-        res = add_squares_threaded(numbers_to_add, 4, num_items)
-        print(f"threaded, num_items ({num_items}): ", res["time_used"], res["result"])
-
-    for num_threads in range(1, 6):
-        res = add_squares_threaded(numbers_to_add, num_threads, 1000)
-        print(
-            f"threaded, num_threads ({num_threads}): ", res["time_used"], res["result"]
-        )
 
 
 def check_count_primes_performance(
     numbers_to_check,
-    num_items_per_chunk,
     num_threadss,
-    num_feeding_queues,
     map_reduce_funct,
+    num_computing_threads_argument_name,
+    initial_reduce_value,
 ):
     times_used = []
     results = []
     for num_threads in num_threadss:
+        kwargs = {num_computing_threads_argument_name: num_threads}
+        if initial_reduce_value is not None:
+            kwargs["initial_reduce_value"] = initial_reduce_value
+        this_map_reduce_funct = partial(map_reduce_funct, **kwargs)
         res = count_primes_threaded(
             numbers_to_check,
-            num_threads,
-            num_items_per_chunk,
-            num_feeding_queues,
-            map_reduce_funct,
+            this_map_reduce_funct,
         )
         times_used.append(res["time_used"])
         results.append(res["result"])
     return {
         "n_threads": numpy.array(num_threadss),
-        "times_used": numpy.array(times_used),
+        "times": numpy.array(times_used),
         "results": numpy.array(results),
     }
 
 
-def do_prime_experiment(
+def do_prime_experiment_with_several_chunk_sizes(
     num_numbers_to_check,
     num_items_per_chunks,
-    num_threads,
-    num_feeding_queues,
+    num_threadss,
     map_reduce_funct,
+    chunk_size_argument_name,
+    num_computing_threads_argument_name,
+    num_feeding_queues,
+    initial_reduce_value,
 ):
-    funct_name = map_reduce_funct.__name__
-    if funct_name == "_map_reduce_with_thread_pool_and_buffers":
-        experiment_name = "with_buffers"
-    elif funct_name == "_map_reduce_with_thread_pool_no_feeding_queue":
-        experiment_name = "no_feeding_queue"
-    elif funct_name == "_map_reduce_with_thread_pool_with_feeding_queues":
-        experiment_name = "with_feeding_queues"
-    elif funct_name == "_map_reduce_naive":
-        experiment_name = "naive"
-    elif funct_name == "map_reduce_with_executor":
-        experiment_name = "executor"
-    elif funct_name == "map_reduce_with_executor_naive":
-        experiment_name = "executor_naive"
-    else:
-        experiment_name = "other_experiment"
+    non_threaded_result = count_primes_non_threaded(num_numbers_to_check)
+    result = {
+        "non_threaded_time": non_threaded_result["time"],
+        "results_for_different_chunk_sizes": [],
+    }
+    non_threaded_result = non_threaded_result["result"]
 
     for num_items_per_chunk in num_items_per_chunks:
-        non_threaded_result = count_primes_standard(num_numbers_to_check)
-        print(non_threaded_result)
+        kwargs = {}
+        if chunk_size_argument_name:
+            kwargs[chunk_size_argument_name] = num_items_per_chunk
+        if num_feeding_queues:
+            kwargs["num_feeding_queues"] = num_feeding_queues
+
+        this_map_reduce_funct = partial(map_reduce_funct, **kwargs)
 
         res = check_count_primes_performance(
             num_numbers_to_check,
-            num_items_per_chunk,
-            num_threads,
-            num_feeding_queues,
-            map_reduce_funct,
+            num_threadss,
+            this_map_reduce_funct,
+            num_computing_threads_argument_name,
+            initial_reduce_value=initial_reduce_value,
         )
-        assert numpy.all(res["results"] == non_threaded_result["result"])
-        print(res)
-
-        base_fname = f"primes.{get_python_version()}.num_numbers_to_check_{num_numbers_to_check}.{experiment_name}"
-        if experiment_name == "with_buffers":
-            title = f"nums. checked: {num_numbers_to_check}, buffer_size: {num_items_per_chunk}"
-            base_fname += f".buffer_size_{num_items_per_chunk}"
-        elif experiment_name in "no_feeding_queue":
-            title = f"nums. checked: {num_numbers_to_check}, chunk_size: {num_items_per_chunk}"
-            base_fname += f".num_items_per_chunk_{num_items_per_chunk}"
-        elif experiment_name == "with_feeding_queues":
-            title = f"nums. checked: {num_numbers_to_check}, chunk_size: {num_items_per_chunk}, n_feeding_queues: {num_feeding_queues}"
-            base_fname += f".num_items_per_chunk_{num_items_per_chunk}.n_feeding_{num_feeding_queues}"
-        elif experiment_name == "naive":
-            title = f"nums. checked: {num_numbers_to_check}"
-        elif experiment_name == "executor":
-            title = f"nums. checked: {num_numbers_to_check}, chunk_size: {num_items_per_chunk}"
-            base_fname += f".num_items_per_chunk_{num_items_per_chunk}"
-        elif experiment_name == "executor_naive":
-            title = f"nums. checked: {num_numbers_to_check}"
-        else:
-            title = f"nums. checked: {num_numbers_to_check}"
-
-        plot_path = charts_dir / f"{base_fname}.time.png"
-
-        fig, axes = plt.subplots()
-        axes.plot(
-            res["n_threads"],
-            res["times_used"],
-            linestyle="-",
-            marker="o",
-            color="blue",
-            label="threaded",
-        )
-        ideal_times = non_threaded_result["time_used"] / res["n_threads"]
-        axes.plot(
-            res["n_threads"],
-            ideal_times,
-            linestyle="-",
-            marker="o",
-            color="grey",
-            label="ideal",
-        )
-        xmin, xmax = axes.get_xlim()
-        axes.hlines(
-            non_threaded_result["time_used"],
-            xmin=xmin,
-            xmax=xmax,
-            color="red",
-            label="non_threaded",
-        )
-        axes.set_ylim(bottom=0, top=axes.get_ylim()[1])
-        axes.set_ylabel("Time (s)")
-        axes.set_xlabel("Num. threads")
-        axes.set_title(title)
-        axes.legend()
-        fig.savefig(str(plot_path))
-
-        speedup = non_threaded_result["time_used"] / res["times_used"]
-        efficiency = speedup / res["n_threads"]
-        plot_path = charts_dir / f"{base_fname}.efficiency.png"
-        fig, axes = plt.subplots()
-        axes.plot(
-            res["n_threads"],
-            efficiency,
-            linestyle="-",
-            marker="o",
-            color="blue",
-        )
-        axes.set_ylim(bottom=0, top=axes.get_ylim()[1])
-        axes.set_ylabel("Efficiency")
-        axes.set_xlabel("Num. threads")
-        axes.set_title(title)
-        fig.savefig(str(plot_path))
-
-
-def split_range(range_, num_items):
-    start = range_.start
-    stop = range_.stop
-    for this_start in range(start, stop, num_items):
-        this_stop = this_start + num_items
-        if this_stop > stop:
-            this_stop = stop
-        yield range(this_start, this_stop)
-
-
-def count_primes_in_range_standard(ranges_to_check):
-    start_time = time()
-    result = reduce(add, map(count_prime_numbers_in_range, ranges_to_check))
-    end_time = time()
-    return {"time_used": end_time - start_time, "result": result}
-
-
-def check_count_primes_in_range_threaded(
-    ranges_to_check,
-    num_numbers_to_check,
-    n_items_in_range,
-    num_items_per_chunk,
-    num_computing_threadss,
-    num_feeding_queues,
-):
-    times = []
-    results = []
-    for num_computing_threads in num_computing_threadss:
-        print("num threads", num_computing_threads)
-        range_to_check = range(2, num_numbers_to_check)
-        ranges_to_check = split_range(range_to_check, n_items_in_range)
-        start_time = time()
-        if num_feeding_queues:
-            res = map_reduce_with_thread_pool_with_feeding_queues(
-                count_prime_numbers_in_range,
-                add,
-                ranges_to_check,
-                num_computing_threads=num_computing_threads,
-                num_items_per_chunk=num_items_per_chunk,
-                num_feeding_queues=num_feeding_queues,
-            )
-        else:
-            res = map_reduce_with_thread_pool_no_feeding_queue(
-                count_prime_numbers_in_range,
-                add,
-                ranges_to_check,
-                num_computing_threads=num_computing_threads,
-                num_items_per_chunk=num_items_per_chunk,
-            )
-        end_time = time()
-        times.append(end_time - start_time)
-        results.append(res)
-        print(times)
-    times = numpy.array(times)
-    results = numpy.array(results)
-
-    return {
-        "times_used": times,
-        "results": results,
-        "n_threads": num_computing_threadss,
-    }
-
-
-def do_prime_range_experiment(
-    n_items_in_range, num_items_per_chunks, num_threads, num_feeding_queues
-):
-    num_ranges_total = max(num_items_per_chunks) * 16 * 2
-    num_numbers_to_check = num_ranges_total * n_items_in_range
-
-    experiment_name = "primes_with_ranges"
-
-    for num_items_per_chunk in num_items_per_chunks:
-        range_to_check = range(2, num_numbers_to_check)
-        ranges_to_check = split_range(range_to_check, n_items_in_range)
-        non_threaded_result = count_primes_in_range_standard(ranges_to_check)
-
-        res = check_count_primes_in_range_threaded(
-            ranges_to_check,
-            num_numbers_to_check,
-            n_items_in_range,
-            num_items_per_chunk,
-            num_threads,
-            num_feeding_queues,
-        )
-        assert numpy.all(res["results"] == non_threaded_result["result"])
-
-        plot_path = (
-            charts_dir
-            / f"{experiment_name}.{get_python_version()}.n_numbers_to_check_{num_items_per_chunk}.n_items_in_range_{n_items_in_range}.n_items_per_chunk_{num_items_per_chunk}.n_feeding_queues.{num_feeding_queues}.time.png"
-        )
-        fig, axes = plt.subplots()
-        axes.plot(
-            res["n_threads"],
-            res["times_used"],
-            linestyle="-",
-            marker="o",
-            color="blue",
-        )
-        axes.set_ylim(bottom=0, top=axes.get_ylim()[1])
-        axes.set_ylabel("Time (s)")
-        axes.set_xlabel("Num. threads")
-        axes.set_title(
-            f"N. feeders: {num_feeding_queues}, N. items chunk: {num_items_per_chunk}, N. nums to check: {num_numbers_to_check}"
-        )
-        fig.savefig(str(plot_path))
-
-        speedup = res["times_used"][0] / res["times_used"]
-        efficiency = speedup / res["n_threads"]
-        plot_path = (
-            charts_dir
-            / f"{experiment_name}.{get_python_version()}.n_numbers_to_check_{num_numbers_to_check}.n_items_in_range_{n_items_in_range}.n_items_per_chunk_{num_items_per_chunk}.n_feeding_queues.{num_feeding_queues}.efficiency.png"
-        )
-        fig, axes = plt.subplots()
-        axes.plot(
-            res["n_threads"],
-            efficiency,
-            linestyle="-",
-            marker="o",
-            color="blue",
-        )
-        axes.set_ylim(bottom=0, top=axes.get_ylim()[1])
-        axes.set_ylabel("Efficiency")
-        axes.set_xlabel("Num. threads")
-        axes.set_title(
-            f"N. feeders: {num_feeding_queues}, N. items chunk: {num_items_per_chunk}, N. nums to check: {num_numbers_to_check}"
-        )
-        fig.savefig(str(plot_path))
+        assert numpy.all(res["results"] == non_threaded_result)
+        this_result = {
+            "chunk_size": num_items_per_chunk,
+            "n_threads": res["n_threads"],
+            "times": res["times"],
+        }
+        result["results_for_different_chunk_sizes"].append(this_result)
+    return result
 
 
 def get_python_version():
@@ -449,35 +143,201 @@ def get_python_version():
     return version
 
 
-if __name__ == "__main__":
-    performance_dir = Path(__file__).parent
-    charts_dir = performance_dir / "charts"
-    charts_dir.mkdir(exist_ok=True)
-    # map_reduce_funct = _map_reduce_with_thread_pool_and_buffers
-    # map_reduce_funct = _map_reduce_with_thread_pool_no_feeding_queue
-    # map_reduce_funct = _map_reduce_naive
-    map_reduce_funct = _map_reduce_with_thread_pool_with_feeding_queues
-    map_reduce_funct = map_reduce_with_executor_naive
-    # map_reduce_funct = map_reduce_with_executor
+def plot_results(
+    experiment_name, results, charts_dir, chunk_size_argument_name, num_feeding_queues
+):
+    non_threaded_time = results["non_threaded_time"]
+    nice_experiment_name = experiment_name.capitalize().replace("_", " ")
 
-    if True:
-        num_numbers_to_check = 1000000
-        num_items_per_chunks = (1000, 100, 1)
-        num_threads = list(range(1, 17))
-        num_feeding_queues = 1
-        do_prime_experiment(
+    base_fname = f"{get_python_version()}"
+    for result in results["results_for_different_chunk_sizes"]:
+        chunk_size = result["chunk_size"]
+        if num_feeding_queues and chunk_size_argument_name:
+            title = f"{nice_experiment_name}, {chunk_size_argument_name}: {chunk_size}, feeding queues: {num_feeding_queues}"
+            this_base_fname = f"{base_fname}.{chunk_size_argument_name}_{chunk_size}.feeding_queues_{num_feeding_queues}"
+        elif chunk_size_argument_name:
+            title = f"{nice_experiment_name}, {chunk_size_argument_name}: {chunk_size}"
+            this_base_fname = f"{base_fname}.{chunk_size_argument_name}_{chunk_size}"
+        else:
+            title = f"{nice_experiment_name}"
+            this_base_fname = f"{base_fname}"
+
+        plot_path = charts_dir / f"{this_base_fname}.time.png"
+        fig, axes = plt.subplots()
+        axes.plot(
+            result["n_threads"],
+            result["times"],
+            linestyle="-",
+            marker="o",
+            color="blue",
+            label="threaded",
+        )
+        ideal_times = non_threaded_time / result["n_threads"]
+        axes.plot(
+            result["n_threads"],
+            ideal_times,
+            linestyle="-",
+            marker="o",
+            color="grey",
+            label="ideal",
+        )
+        xmin, xmax = axes.get_xlim()
+        axes.hlines(
+            non_threaded_time,
+            xmin=xmin,
+            xmax=xmax,
+            color="red",
+            label="non_threaded",
+        )
+        axes.set_ylim(bottom=0, top=axes.get_ylim()[1])
+        axes.set_ylabel("Time (s)")
+        axes.set_xlabel("Num. threads")
+        axes.set_title(title)
+        axes.legend()
+        fig.savefig(plot_path)
+
+        speedup = non_threaded_time / result["times"]
+        efficiency = speedup / result["n_threads"]
+        plot_path = charts_dir / f"{this_base_fname}.efficiency.png"
+        fig, axes = plt.subplots()
+        axes.plot(
+            result["n_threads"],
+            efficiency,
+            linestyle="-",
+            marker="o",
+            color="blue",
+        )
+        axes.set_ylim(bottom=0, top=axes.get_ylim()[1])
+        axes.set_ylabel("Efficiency")
+        axes.set_xlabel("Num. threads")
+        axes.set_title(title)
+        fig.savefig(plot_path)
+
+
+def check_performance_with_primes():
+    num_numbers_to_check = 1000000
+    # num_numbers_to_check = 100000
+    num_numbers_to_check = 50000
+    num_items_per_chunks_to_test = (1000, 100, 1)
+    num_threadss = list(range(1, 17))
+
+    # Iterator is chunked.
+    # While a chunk is being created a lock is put in the iterator because iterators are not thread safe
+    # Chunks are lists
+    # a pool of computing threads is created
+    # each thread computes a chunk at a time
+    # results are returned by the threads in a queue
+    experiment_1 = {
+        "map_reduce_funct": map_reduce_with_thread_pool_and_buffers,
+        "name": "thread_pool_and_buffers",
+        "chunk_size_argument_name": "buffer_size",
+        "num_computing_threads_argument_name": "num_computing_threads",
+    }
+
+    # The iterator is made thread safe by locking while getting each next item
+    # a pool of computing threads is created
+    # each thread computes an item at a time
+    # results are returned by the threads in a queue
+    experiment_2 = {
+        "map_reduce_funct": map_reduce_naive,
+        "name": "naive_map_reduce",
+        "num_computing_threads_argument_name": "num_computing_threads",
+    }
+
+    # the chunks are islices
+    # the chunks iterator is made thread safe by putting it inside a ThreadSafeIterator
+    # a pool of computing threads is created
+    # each thread computes a chunk at a time
+    # results are returned by the threads in a queue
+    experiment_3 = {
+        "map_reduce_funct": map_reduce_with_thread_pool_no_feeding_queue,
+        "name": "thread_pool_no_feeding_queue",
+        "chunk_size_argument_name": "num_items_per_chunk",
+        "num_computing_threads_argument_name": "num_computing_threads",
+    }
+
+    # a feeding queue is created to feed the computing
+    # a feeding thread is created to push items into every feeding queue
+    # the computing threads a connected to the the feeding queues
+    # results are returned by the threads in a queue
+    experiment_4 = {
+        "map_reduce_funct": map_reduce_with_thread_pool_with_feeding_queues,
+        "name": "thread_pool_with_feeding_queues",
+        "chunk_size_argument_name": "num_items_per_chunk",
+        "num_feeding_queues": 2,
+        "num_computing_threads_argument_name": "num_computing_threads",
+    }
+
+    # a threadpoolexecutor is created
+    # for each item a task is created and the result of the task is represented by a future object
+    # the futures are awaited when there are more than workers (to not fill the memory)
+    experiment_5 = {
+        "map_reduce_funct": map_reduce_with_executor_naive,
+        "name": "thread_pool_executor_naive",
+        "num_computing_threads_argument_name": "max_workers",
+        "initial_reduce_value": 0,
+    }
+
+    # chunks are created
+    # each chunk is a list
+    # for each chunk a task is created and the result of the task is represented by a future object
+    # the futures are awaited when there are more than workers (to not fill the memory)
+    experiment_6 = {
+        "map_reduce_funct": map_reduce_with_executor,
+        "name": "thread_pool_executor",
+        "num_computing_threads_argument_name": "max_workers",
+        "initial_reduce_value": 0,
+        "chunk_size_argument_name": "num_items_per_chunk",
+    }
+
+    base_charts_dir = Path(__file__).parent / "charts"
+    base_charts_dir.mkdir(exist_ok=True)
+    charts_dir = base_charts_dir / "primes"
+    charts_dir.mkdir(exist_ok=True)
+    charts_dir = charts_dir / f"num_numbers_{num_numbers_to_check}"
+    charts_dir.mkdir(exist_ok=True)
+
+    experiments = [
+        experiment_1,
+        experiment_2,
+        experiment_3,
+        experiment_4,
+        experiment_5,
+        experiment_6,
+    ]
+    # experiments = [experiment_5]
+    for experiment in experiments:
+        this_charts_dir = charts_dir / f"{experiment['name']}"
+        this_charts_dir.mkdir(exist_ok=True)
+
+        if experiment.get("chunk_size_argument_name") is None:
+            num_items_per_chunks = (1,)
+        else:
+            num_items_per_chunks = num_items_per_chunks_to_test
+
+        num_feeding_queues = experiment.get("num_feeding_queues")
+        chunk_size_argument_name = experiment.get("chunk_size_argument_name")
+        results = do_prime_experiment_with_several_chunk_sizes(
             num_numbers_to_check,
             num_items_per_chunks,
-            num_threads,
-            num_feeding_queues,
-            map_reduce_funct,
+            num_threadss,
+            experiment["map_reduce_funct"],
+            chunk_size_argument_name=chunk_size_argument_name,
+            num_computing_threads_argument_name=experiment[
+                "num_computing_threads_argument_name"
+            ],
+            num_feeding_queues=num_feeding_queues,
+            initial_reduce_value=experiment.get("initial_reduce_value"),
         )
 
-    if False:
-        n_items_in_range = 10000
-        num_items_per_chunks = (1, 20)
-        num_threads = list(range(1, 17))
-        num_feeding_queues = 1
-        do_prime_range_experiment(
-            n_items_in_range, num_items_per_chunks, num_threads, num_feeding_queues
+        plot_results(
+            experiment["name"],
+            results,
+            charts_dir=this_charts_dir,
+            chunk_size_argument_name=chunk_size_argument_name,
+            num_feeding_queues=num_feeding_queues,
         )
+
+
+if __name__ == "__main__":
+    check_performance_with_primes()
