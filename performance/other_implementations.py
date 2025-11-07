@@ -130,7 +130,7 @@ def _map_reduce_chunks_from_iterator(chunks, results_queue, map_fn, reduce_fn):
     results_queue.put(result)
 
 
-def _map_reduce_with_thread_pool_no_feeding_queue(
+def map_reduce_with_thread_pool_no_feeding_queue(
     map_fn,
     reduce_fn,
     iterable: Iterable,

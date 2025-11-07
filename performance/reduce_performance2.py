@@ -8,7 +8,10 @@ import numpy
 import matplotlib.pyplot as plt
 
 from threaded_map_reduce import map_reduce as map_reduce_with_thread_pool_and_buffers
-from other_implementations import map_reduce_naive
+from other_implementations import (
+    map_reduce_naive,
+    map_reduce_with_thread_pool_no_feeding_queue,
+)
 
 
 def is_prime(n):
@@ -217,6 +220,15 @@ def check_performance_with_primes():
     map_reduce_funct = map_reduce_naive
     experiment_name = "naive_map_reduce"
     chunk_size_argument_name = None
+
+    # the chunks are islices
+    # the chunks iterator is made thread safe by putting it inside a ThreadSafeIterator
+    # a pool of computing threads is created
+    # each thread computes a chunk at a time
+    # results are returned by the threads in a queue
+    map_reduce_funct = map_reduce_with_thread_pool_no_feeding_queue
+    experiment_name = "thread_pool_no_feeding_queue"
+    chunk_size_argument_name = "num_items_per_chunk"
 
     if chunk_size_argument_name is None:
         num_items_per_chunks = (1,)
