@@ -11,6 +11,7 @@ from threaded_map_reduce import map_reduce as map_reduce_with_thread_pool_and_bu
 from other_implementations import (
     map_reduce_naive,
     map_reduce_with_thread_pool_no_feeding_queue,
+    map_reduce_with_thread_pool_with_feeding_queues,
 )
 
 
@@ -93,6 +94,7 @@ def do_prime_experiment_with_several_chunk_sizes(
     num_threadss,
     map_reduce_funct,
     chunk_size_argument_name,
+    num_feeding_queues,
 ):
     non_threaded_result = count_primes_non_threaded(num_numbers_to_check)
     result = {
@@ -105,6 +107,8 @@ def do_prime_experiment_with_several_chunk_sizes(
         kwargs = {}
         if chunk_size_argument_name:
             kwargs[chunk_size_argument_name] = num_items_per_chunk
+        if num_feeding_queues:
+            kwargs["num_feeding_queues"] = num_feeding_queues
 
         this_map_reduce_funct = partial(map_reduce_funct, **kwargs)
 
@@ -131,14 +135,19 @@ def get_python_version():
     return version
 
 
-def plot_results(experiment_name, results, charts_dir, chunk_size_argument_name):
+def plot_results(
+    experiment_name, results, charts_dir, chunk_size_argument_name, num_feeding_queues
+):
     non_threaded_time = results["non_threaded_time"]
     nice_experiment_name = experiment_name.capitalize().replace("_", " ")
 
     base_fname = f"{get_python_version()}"
     for result in results["results_for_different_chunk_sizes"]:
         chunk_size = result["chunk_size"]
-        if chunk_size_argument_name:
+        if num_feeding_queues and chunk_size_argument_name:
+            title = f"{nice_experiment_name}, {chunk_size_argument_name}: {chunk_size}, feeding queues: {num_feeding_queues}"
+            this_base_fname = f"{base_fname}.{chunk_size_argument_name}_{chunk_size}.feeding_queues_{num_feeding_queues}"
+        elif chunk_size_argument_name:
             title = f"{nice_experiment_name}, {chunk_size_argument_name}: {chunk_size}"
             this_base_fname = f"{base_fname}.{chunk_size_argument_name}_{chunk_size}"
         else:
@@ -199,7 +208,7 @@ def plot_results(experiment_name, results, charts_dir, chunk_size_argument_name)
 
 def check_performance_with_primes():
     num_numbers_to_check = 1000000
-    num_numbers_to_check = 100000
+    # num_numbers_to_check = 100000
     num_items_per_chunks_to_test = (1000, 100, 1)
     num_threadss = list(range(1, 17))
 
@@ -222,7 +231,6 @@ def check_performance_with_primes():
     experiment_2 = {
         "map_reduce_funct": map_reduce_naive,
         "name": "naive_map_reduce",
-        "chunk_size_argument_name": None,
     }
 
     # the chunks are islices
@@ -236,6 +244,17 @@ def check_performance_with_primes():
         "chunk_size_argument_name": "num_items_per_chunk",
     }
 
+    # a feeding queue is created to feed the computing
+    # a feeding thread is created to push items into every feeding queue
+    # the computing threads a connected to the the feeding queues
+    # results are returned by the threads in a queue
+    experiment_4 = {
+        "map_reduce_funct": map_reduce_with_thread_pool_with_feeding_queues,
+        "name": "thread_pool_with_feeding_queues",
+        "chunk_size_argument_name": "num_items_per_chunk",
+        "num_feeding_queues": 2,
+    }
+
     base_charts_dir = Path(__file__).parent / "charts"
     base_charts_dir.mkdir(exist_ok=True)
     charts_dir = base_charts_dir / "primes"
@@ -244,6 +263,7 @@ def check_performance_with_primes():
     charts_dir.mkdir(exist_ok=True)
 
     experiments = [experiment_1, experiment_2, experiment_3]
+    experiments = [experiment_4]
     for experiment in experiments:
         this_charts_dir = charts_dir / f"{experiment['name']}"
         this_charts_dir.mkdir(exist_ok=True)
@@ -253,19 +273,23 @@ def check_performance_with_primes():
         else:
             num_items_per_chunks = num_items_per_chunks_to_test
 
+        num_feeding_queues = experiment.get("num_feeding_queues")
+        chunk_size_argument_name = experiment.get("chunk_size_argument_name")
         results = do_prime_experiment_with_several_chunk_sizes(
             num_numbers_to_check,
             num_items_per_chunks,
             num_threadss,
             experiment["map_reduce_funct"],
-            experiment["chunk_size_argument_name"],
+            chunk_size_argument_name=chunk_size_argument_name,
+            num_feeding_queues=num_feeding_queues,
         )
 
         plot_results(
             experiment["name"],
             results,
             charts_dir=this_charts_dir,
-            chunk_size_argument_name=experiment["chunk_size_argument_name"],
+            chunk_size_argument_name=chunk_size_argument_name,
+            num_feeding_queues=num_feeding_queues,
         )
 
 

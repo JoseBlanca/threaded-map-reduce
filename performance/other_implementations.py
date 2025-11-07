@@ -70,7 +70,7 @@ class ThreadSafeIterator(Iterator):
             return next(self._it)
 
 
-def _map_reduce_with_thread_pool_with_feeding_queues(
+def map_reduce_with_thread_pool_with_feeding_queues(
     map_fn,
     reduce_fn,
     iterable: Iterable,
