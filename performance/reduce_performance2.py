@@ -200,7 +200,7 @@ def plot_results(experiment_name, results, charts_dir, chunk_size_argument_name)
 def check_performance_with_primes():
     num_numbers_to_check = 1000000
     num_numbers_to_check = 100000
-    num_items_per_chunks = (1000, 100, 1)
+    num_items_per_chunks_to_test = (1000, 100, 1)
     num_threadss = list(range(1, 17))
 
     # Iterator is chunked.
@@ -209,29 +209,32 @@ def check_performance_with_primes():
     # a pool of computing threads is created
     # each thread computes a chunk at a time
     # results are returned by the threads in a queue
-    map_reduce_funct = map_reduce_with_thread_pool_and_buffers
-    experiment_name = "thread_pool_and_buffers"
-    chunk_size_argument_name = "buffer_size"
+    experiment_1 = {
+        "map_reduce_funct": map_reduce_with_thread_pool_and_buffers,
+        "name": "thread_pool_and_buffers",
+        "chunk_size_argument_name": "buffer_size",
+    }
 
     # The iterator is made thread safe by locking while getting each next item
     # a pool of computing threads is created
     # each thread computes an item at a time
     # results are returned by the threads in a queue
-    map_reduce_funct = map_reduce_naive
-    experiment_name = "naive_map_reduce"
-    chunk_size_argument_name = None
+    experiment_2 = {
+        "map_reduce_funct": map_reduce_naive,
+        "name": "naive_map_reduce",
+        "chunk_size_argument_name": None,
+    }
 
     # the chunks are islices
     # the chunks iterator is made thread safe by putting it inside a ThreadSafeIterator
     # a pool of computing threads is created
     # each thread computes a chunk at a time
     # results are returned by the threads in a queue
-    map_reduce_funct = map_reduce_with_thread_pool_no_feeding_queue
-    experiment_name = "thread_pool_no_feeding_queue"
-    chunk_size_argument_name = "num_items_per_chunk"
-
-    if chunk_size_argument_name is None:
-        num_items_per_chunks = (1,)
+    experiment_3 = {
+        "map_reduce_funct": map_reduce_with_thread_pool_no_feeding_queue,
+        "name": "thread_pool_no_feeding_queue",
+        "chunk_size_argument_name": "num_items_per_chunk",
+    }
 
     base_charts_dir = Path(__file__).parent / "charts"
     base_charts_dir.mkdir(exist_ok=True)
@@ -239,23 +242,31 @@ def check_performance_with_primes():
     charts_dir.mkdir(exist_ok=True)
     charts_dir = charts_dir / f"num_numbers_{num_numbers_to_check}"
     charts_dir.mkdir(exist_ok=True)
-    charts_dir = charts_dir / f"{experiment_name}"
-    charts_dir.mkdir(exist_ok=True)
 
-    results = do_prime_experiment_with_several_chunk_sizes(
-        num_numbers_to_check,
-        num_items_per_chunks,
-        num_threadss,
-        map_reduce_funct,
-        chunk_size_argument_name,
-    )
+    experiments = [experiment_1, experiment_2, experiment_3]
+    for experiment in experiments:
+        this_charts_dir = charts_dir / f"{experiment['name']}"
+        this_charts_dir.mkdir(exist_ok=True)
 
-    plot_results(
-        experiment_name,
-        results,
-        charts_dir=charts_dir,
-        chunk_size_argument_name=chunk_size_argument_name,
-    )
+        if experiment["chunk_size_argument_name"] is None:
+            num_items_per_chunks = (1,)
+        else:
+            num_items_per_chunks = num_items_per_chunks_to_test
+
+        results = do_prime_experiment_with_several_chunk_sizes(
+            num_numbers_to_check,
+            num_items_per_chunks,
+            num_threadss,
+            experiment["map_reduce_funct"],
+            experiment["chunk_size_argument_name"],
+        )
+
+        plot_results(
+            experiment["name"],
+            results,
+            charts_dir=this_charts_dir,
+            chunk_size_argument_name=experiment["chunk_size_argument_name"],
+        )
 
 
 if __name__ == "__main__":
