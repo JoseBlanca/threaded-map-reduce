@@ -13,6 +13,7 @@ from other_implementations import (
     map_reduce_with_thread_pool_no_feeding_queue,
     map_reduce_with_thread_pool_with_feeding_queues,
 )
+from futures_map_reduce import map_reduce_with_executor, map_reduce_with_executor_naive
 
 
 def is_prime(n):
@@ -51,7 +52,6 @@ def count_primes_non_threaded(num_numbers):
 
 def count_primes_threaded(
     num_numbers,
-    num_computing_threads,
     map_reduce_funct,
 ):
     numbers = range(1, num_numbers)
@@ -60,7 +60,6 @@ def count_primes_threaded(
         is_prime,
         add,
         numbers,
-        num_computing_threads=num_computing_threads,
     )
     time_used = time() - start_time
     return {"time_used": time_used, "result": total}
@@ -70,14 +69,19 @@ def check_count_primes_performance(
     numbers_to_check,
     num_threadss,
     map_reduce_funct,
+    num_computing_threads_argument_name,
+    initial_reduce_value,
 ):
     times_used = []
     results = []
     for num_threads in num_threadss:
+        kwargs = {num_computing_threads_argument_name: num_threads}
+        if initial_reduce_value is not None:
+            kwargs["initial_reduce_value"] = initial_reduce_value
+        this_map_reduce_funct = partial(map_reduce_funct, **kwargs)
         res = count_primes_threaded(
             numbers_to_check,
-            num_threads,
-            map_reduce_funct,
+            this_map_reduce_funct,
         )
         times_used.append(res["time_used"])
         results.append(res["result"])
@@ -94,7 +98,9 @@ def do_prime_experiment_with_several_chunk_sizes(
     num_threadss,
     map_reduce_funct,
     chunk_size_argument_name,
+    num_computing_threads_argument_name,
     num_feeding_queues,
+    initial_reduce_value,
 ):
     non_threaded_result = count_primes_non_threaded(num_numbers_to_check)
     result = {
@@ -116,6 +122,8 @@ def do_prime_experiment_with_several_chunk_sizes(
             num_numbers_to_check,
             num_threadss,
             this_map_reduce_funct,
+            num_computing_threads_argument_name,
+            initial_reduce_value=initial_reduce_value,
         )
         assert numpy.all(res["results"] == non_threaded_result)
         this_result = {
@@ -209,6 +217,7 @@ def plot_results(
 def check_performance_with_primes():
     num_numbers_to_check = 1000000
     # num_numbers_to_check = 100000
+    num_numbers_to_check = 50000
     num_items_per_chunks_to_test = (1000, 100, 1)
     num_threadss = list(range(1, 17))
 
@@ -222,6 +231,7 @@ def check_performance_with_primes():
         "map_reduce_funct": map_reduce_with_thread_pool_and_buffers,
         "name": "thread_pool_and_buffers",
         "chunk_size_argument_name": "buffer_size",
+        "num_computing_threads_argument_name": "num_computing_threads",
     }
 
     # The iterator is made thread safe by locking while getting each next item
@@ -231,6 +241,7 @@ def check_performance_with_primes():
     experiment_2 = {
         "map_reduce_funct": map_reduce_naive,
         "name": "naive_map_reduce",
+        "num_computing_threads_argument_name": "num_computing_threads",
     }
 
     # the chunks are islices
@@ -242,6 +253,7 @@ def check_performance_with_primes():
         "map_reduce_funct": map_reduce_with_thread_pool_no_feeding_queue,
         "name": "thread_pool_no_feeding_queue",
         "chunk_size_argument_name": "num_items_per_chunk",
+        "num_computing_threads_argument_name": "num_computing_threads",
     }
 
     # a feeding queue is created to feed the computing
@@ -253,6 +265,29 @@ def check_performance_with_primes():
         "name": "thread_pool_with_feeding_queues",
         "chunk_size_argument_name": "num_items_per_chunk",
         "num_feeding_queues": 2,
+        "num_computing_threads_argument_name": "num_computing_threads",
+    }
+
+    # a threadpoolexecutor is created
+    # for each item a task is created and the result of the task is represented by a future object
+    # the futures are awaited when there are more than workers (to not fill the memory)
+    experiment_5 = {
+        "map_reduce_funct": map_reduce_with_executor_naive,
+        "name": "thread_pool_executor_naive",
+        "num_computing_threads_argument_name": "max_workers",
+        "initial_reduce_value": 0,
+    }
+
+    # chunks are created
+    # each chunk is a list
+    # for each chunk a task is created and the result of the task is represented by a future object
+    # the futures are awaited when there are more than workers (to not fill the memory)
+    experiment_6 = {
+        "map_reduce_funct": map_reduce_with_executor,
+        "name": "thread_pool_executor",
+        "num_computing_threads_argument_name": "max_workers",
+        "initial_reduce_value": 0,
+        "chunk_size_argument_name": "num_items_per_chunk",
     }
 
     base_charts_dir = Path(__file__).parent / "charts"
@@ -262,13 +297,20 @@ def check_performance_with_primes():
     charts_dir = charts_dir / f"num_numbers_{num_numbers_to_check}"
     charts_dir.mkdir(exist_ok=True)
 
-    experiments = [experiment_1, experiment_2, experiment_3]
-    experiments = [experiment_4]
+    experiments = [
+        experiment_1,
+        experiment_2,
+        experiment_3,
+        experiment_4,
+        experiment_5,
+        experiment_6,
+    ]
+    # experiments = [experiment_5]
     for experiment in experiments:
         this_charts_dir = charts_dir / f"{experiment['name']}"
         this_charts_dir.mkdir(exist_ok=True)
 
-        if experiment["chunk_size_argument_name"] is None:
+        if experiment.get("chunk_size_argument_name") is None:
             num_items_per_chunks = (1,)
         else:
             num_items_per_chunks = num_items_per_chunks_to_test
@@ -281,7 +323,11 @@ def check_performance_with_primes():
             num_threadss,
             experiment["map_reduce_funct"],
             chunk_size_argument_name=chunk_size_argument_name,
+            num_computing_threads_argument_name=experiment[
+                "num_computing_threads_argument_name"
+            ],
             num_feeding_queues=num_feeding_queues,
+            initial_reduce_value=experiment.get("initial_reduce_value"),
         )
 
         plot_results(
