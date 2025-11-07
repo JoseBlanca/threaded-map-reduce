@@ -8,6 +8,7 @@ import numpy
 import matplotlib.pyplot as plt
 
 from threaded_map_reduce import map_reduce as map_reduce_with_thread_pool_and_buffers
+from other_implementations import map_reduce_naive
 
 
 def is_prime(n):
@@ -98,7 +99,10 @@ def do_prime_experiment_with_several_chunk_sizes(
     non_threaded_result = non_threaded_result["result"]
 
     for num_items_per_chunk in num_items_per_chunks:
-        kwargs = {chunk_size_argument_name: num_items_per_chunk}
+        kwargs = {}
+        if chunk_size_argument_name:
+            kwargs[chunk_size_argument_name] = num_items_per_chunk
+
         this_map_reduce_funct = partial(map_reduce_funct, **kwargs)
 
         res = check_count_primes_performance(
@@ -128,11 +132,15 @@ def plot_results(experiment_name, results, charts_dir, chunk_size_argument_name)
     non_threaded_time = results["non_threaded_time"]
     nice_experiment_name = experiment_name.capitalize().replace("_", " ")
 
-    base_fname = f"primes.{get_python_version()}.{experiment_name}"
+    base_fname = f"{get_python_version()}"
     for result in results["results_for_different_chunk_sizes"]:
         chunk_size = result["chunk_size"]
-        title = f"{nice_experiment_name}, {chunk_size_argument_name}: {chunk_size}"
-        this_base_fname = f"{base_fname}.{chunk_size_argument_name}_{chunk_size}"
+        if chunk_size_argument_name:
+            title = f"{nice_experiment_name}, {chunk_size_argument_name}: {chunk_size}"
+            this_base_fname = f"{base_fname}.{chunk_size_argument_name}_{chunk_size}"
+        else:
+            title = f"{nice_experiment_name}"
+            this_base_fname = f"{base_fname}"
 
         plot_path = charts_dir / f"{this_base_fname}.time.png"
         fig, axes = plt.subplots()
@@ -192,11 +200,6 @@ def check_performance_with_primes():
     num_items_per_chunks = (1000, 100, 1)
     num_threadss = list(range(1, 17))
 
-    base_charts_dir = Path(__file__).parent / "charts"
-    base_charts_dir.mkdir(exist_ok=True)
-    charts_dir = base_charts_dir / f"num_numbers_{num_numbers_to_check}"
-    charts_dir.mkdir(exist_ok=True)
-
     # Iterator is chunked.
     # While a chunk is being created a lock is put in the iterator because iterators are not thread safe
     # Chunks are lists
@@ -206,6 +209,26 @@ def check_performance_with_primes():
     map_reduce_funct = map_reduce_with_thread_pool_and_buffers
     experiment_name = "thread_pool_and_buffers"
     chunk_size_argument_name = "buffer_size"
+
+    # The iterator is made thread safe by locking while getting each next item
+    # a pool of computing threads is created
+    # each thread computes an item at a time
+    # results are returned by the threads in a queue
+    map_reduce_funct = map_reduce_naive
+    experiment_name = "naive_map_reduce"
+    chunk_size_argument_name = None
+
+    if chunk_size_argument_name is None:
+        num_items_per_chunks = (1,)
+
+    base_charts_dir = Path(__file__).parent / "charts"
+    base_charts_dir.mkdir(exist_ok=True)
+    charts_dir = base_charts_dir / "primes"
+    charts_dir.mkdir(exist_ok=True)
+    charts_dir = charts_dir / f"num_numbers_{num_numbers_to_check}"
+    charts_dir.mkdir(exist_ok=True)
+    charts_dir = charts_dir / f"{experiment_name}"
+    charts_dir.mkdir(exist_ok=True)
 
     results = do_prime_experiment_with_several_chunk_sizes(
         num_numbers_to_check,

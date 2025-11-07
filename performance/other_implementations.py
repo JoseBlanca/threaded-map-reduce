@@ -178,7 +178,7 @@ def _map_reduce_items(items, results_queue, map_fn, reduce_fn):
     results_queue.put(result)
 
 
-def _map_reduce_naive(
+def map_reduce_naive(
     map_fn,
     reduce_fn,
     iterable: Iterable,
