@@ -197,6 +197,12 @@ def check_performance_with_primes():
     charts_dir = base_charts_dir / f"num_numbers_{num_numbers_to_check}"
     charts_dir.mkdir(exist_ok=True)
 
+    # Iterator is chunked.
+    # While a chunk is being created a lock is put in the iterator because iterators are not thread safe
+    # Chunks are lists
+    # a pool of computing threads is created
+    # each thread computes a chunk at a time
+    # results are returned by the threads in a queue
     map_reduce_funct = map_reduce_with_thread_pool_and_buffers
     experiment_name = "thread_pool_and_buffers"
     chunk_size_argument_name = "buffer_size"
