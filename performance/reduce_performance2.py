@@ -1,8 +1,11 @@
 from time import time
 from functools import reduce, partial
 from operator import add
+from pathlib import Path
+import sys
 
 import numpy
+import matplotlib.pyplot as plt
 
 from threaded_map_reduce import map_reduce as map_reduce_with_thread_pool_and_buffers
 
@@ -85,6 +88,7 @@ def do_prime_experiment_with_several_chunk_sizes(
     num_items_per_chunks,
     num_threadss,
     map_reduce_funct,
+    chunk_size_argument_name,
 ):
     non_threaded_result = count_primes_non_threaded(num_numbers_to_check)
     result = {
@@ -92,10 +96,11 @@ def do_prime_experiment_with_several_chunk_sizes(
         "results_for_different_chunk_sizes": [],
     }
     non_threaded_result = non_threaded_result["result"]
+
     for num_items_per_chunk in num_items_per_chunks:
-        this_map_reduce_funct = partial(
-            map_reduce_funct, buffer_size=num_items_per_chunk
-        )
+        kwargs = {chunk_size_argument_name: num_items_per_chunk}
+        this_map_reduce_funct = partial(map_reduce_funct, **kwargs)
+
         res = check_count_primes_performance(
             num_numbers_to_check,
             num_threadss,
@@ -111,16 +116,104 @@ def do_prime_experiment_with_several_chunk_sizes(
     return result
 
 
+def get_python_version():
+    version_info = sys.version_info
+    version = f"{version_info.major}.{version_info.minor}.{version_info.micro}"
+    if "free-threading" in sys.version:
+        version += "t"
+    return version
+
+
+def plot_results(experiment_name, results, charts_dir, chunk_size_argument_name):
+    non_threaded_time = results["non_threaded_time"]
+    nice_experiment_name = experiment_name.capitalize().replace("_", " ")
+
+    base_fname = f"primes.{get_python_version()}.{experiment_name}"
+    for result in results["results_for_different_chunk_sizes"]:
+        chunk_size = result["chunk_size"]
+        title = f"{nice_experiment_name}, {chunk_size_argument_name}: {chunk_size}"
+        this_base_fname = f"{base_fname}.{chunk_size_argument_name}_{chunk_size}"
+
+        plot_path = charts_dir / f"{this_base_fname}.time.png"
+        fig, axes = plt.subplots()
+        axes.plot(
+            result["n_threads"],
+            result["times"],
+            linestyle="-",
+            marker="o",
+            color="blue",
+            label="threaded",
+        )
+        ideal_times = non_threaded_time / result["n_threads"]
+        axes.plot(
+            result["n_threads"],
+            ideal_times,
+            linestyle="-",
+            marker="o",
+            color="grey",
+            label="ideal",
+        )
+        xmin, xmax = axes.get_xlim()
+        axes.hlines(
+            non_threaded_time,
+            xmin=xmin,
+            xmax=xmax,
+            color="red",
+            label="non_threaded",
+        )
+        axes.set_ylim(bottom=0, top=axes.get_ylim()[1])
+        axes.set_ylabel("Time (s)")
+        axes.set_xlabel("Num. threads")
+        axes.set_title(title)
+        axes.legend()
+        fig.savefig(plot_path)
+
+        speedup = non_threaded_time / result["times"]
+        efficiency = speedup / result["n_threads"]
+        plot_path = charts_dir / f"{this_base_fname}.efficiency.png"
+        fig, axes = plt.subplots()
+        axes.plot(
+            result["n_threads"],
+            efficiency,
+            linestyle="-",
+            marker="o",
+            color="blue",
+        )
+        axes.set_ylim(bottom=0, top=axes.get_ylim()[1])
+        axes.set_ylabel("Efficiency")
+        axes.set_xlabel("Num. threads")
+        axes.set_title(title)
+        fig.savefig(plot_path)
+
+
 def check_performance_with_primes():
     num_numbers_to_check = 1000000
+    num_numbers_to_check = 100000
     num_items_per_chunks = (1000, 100, 1)
     num_threadss = list(range(1, 17))
+
+    base_charts_dir = Path(__file__).parent / "charts"
+    base_charts_dir.mkdir(exist_ok=True)
+    charts_dir = base_charts_dir / f"num_numbers_{num_numbers_to_check}"
+    charts_dir.mkdir(exist_ok=True)
+
     map_reduce_funct = map_reduce_with_thread_pool_and_buffers
-    do_prime_experiment_with_several_chunk_sizes(
+    experiment_name = "thread_pool_and_buffers"
+    chunk_size_argument_name = "buffer_size"
+
+    results = do_prime_experiment_with_several_chunk_sizes(
         num_numbers_to_check,
         num_items_per_chunks,
         num_threadss,
         map_reduce_funct,
+        chunk_size_argument_name,
+    )
+
+    plot_results(
+        experiment_name,
+        results,
+        charts_dir=charts_dir,
+        chunk_size_argument_name=chunk_size_argument_name,
     )
 
 
