@@ -3,6 +3,7 @@ from functools import reduce, partial
 from operator import add
 from pathlib import Path
 import sys
+from math import sqrt
 
 import numpy
 import matplotlib.pyplot as plt
@@ -17,26 +18,26 @@ from futures_map_reduce import map_reduce_with_executor, map_reduce_with_executo
 
 
 def is_prime(n):
-    if n == 2 or n == 3:
-        return True
-    if n < 2 or n % 2 == 0:
+    if n == 1:
         return False
-    if n < 9:
+    elif n == 2 or n == 3:
         return True
-    if n % 3 == 0:
+    elif n % 2 == 0:
         return False
-    r = int(n**0.5)
+    elif n < 9:
+        return True
+    elif n % 3 == 0:
+        return False
+    r = int(sqrt(n))
     # since all primes > 3 are of the form 6n ± 1
     # start with f=5 (which is prime)
     # and test f, f+2 for being prime
     # then loop by 6.
-    f = 5
-    while f <= r:
+    for f in range(5, r + 1, 6):
         if n % f == 0:
             return False
-        if n % (f + 2) == 0:
+        elif n % (f + 2) == 0:
             return False
-        f += 6
     return True
 
 
@@ -217,7 +218,7 @@ def plot_results(
 def check_performance_with_primes():
     num_numbers_to_check = 1000000
     # num_numbers_to_check = 100000
-    num_numbers_to_check = 50000
+    # num_numbers_to_check = 50000
     num_items_per_chunks_to_test = (1000, 100, 1)
     num_threadss = list(range(1, 17))
 
@@ -305,7 +306,7 @@ def check_performance_with_primes():
         experiment_5,
         experiment_6,
     ]
-    # experiments = [experiment_5]
+    experiments = [experiment_1]
     for experiment in experiments:
         this_charts_dir = charts_dir / f"{experiment['name']}"
         this_charts_dir.mkdir(exist_ok=True)
@@ -339,5 +340,12 @@ def check_performance_with_primes():
         )
 
 
+def test_is_prime():
+    primes = [n for n in range(1, 21) if is_prime2(n)]
+    assert primes == [2, 3, 5, 7, 11, 13, 17, 19]
+    print(primes)
+
+
 if __name__ == "__main__":
     check_performance_with_primes()
+    # test_is_prime()
