@@ -106,6 +106,49 @@ def _map_reduce_with_thread_pool_and_buffers(
 map_reduce = _map_reduce_with_thread_pool_and_buffers
 
 
-def threaded_map(map_fn, items, max_workers, chunk_size=1):
+def threaded_map_with_pool_executor(map_fn, items, max_workers, chunk_size=1):
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         return executor.map(map_fn, items, chunksize=chunk_size)
+
+
+def _map_chunks_from_chunk_dispenser(chunk_dispenser, results_queue, map_fn):
+    for chunk in chunk_dispenser:
+        mapped_chunk = map(map_fn, chunk)
+        results_queue.put(mapped_chunk)
+    results_queue.put(UNUSED_THREAD)
+
+
+def threaded_map_with_chunk_dispenser(
+    map_fn, items: Iterable, num_computing_threads: int, chunk_size: int = 100
+):
+    items = iter(items)
+    chunk_dispenser = _ChunkDispenser(items, chunk_size)
+
+    results_queue = queue.Queue()
+
+    mapped_chunks = functools.partial(
+        _map_chunks_from_chunk_dispenser,
+        chunk_dispenser=chunk_dispenser,
+        map_fn=map_fn,
+        results_queue=results_queue,
+    )
+
+    computing_threads = []
+    for idx in range(num_computing_threads):
+        thread = threading.Thread(target=mapped_chunks, name=f"comp_thread_{idx}")
+        thread.start()
+        computing_threads.append(thread)
+
+    num_closed_threads = 0
+    while True:
+        result = results_queue.get()
+        if result is UNUSED_THREAD:
+            num_closed_threads += 1
+            if num_closed_threads == num_computing_threads:
+                results_queue.shutdown()
+                break
+        else:
+            yield from result
+
+
+threaded_map = threaded_map_with_chunk_dispenser

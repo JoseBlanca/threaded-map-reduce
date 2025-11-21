@@ -1,0 +1,2 @@
+change chunk size default value to 100
+change buffer_size to chunk_size in map_reduce
