@@ -3,7 +3,6 @@ from functools import reduce, partial
 from operator import add
 from pathlib import Path
 import sys
-from math import sqrt
 
 import numpy
 import matplotlib.pyplot as plt
@@ -15,30 +14,7 @@ from other_implementations import (
     map_reduce_with_thread_pool_with_feeding_queues,
 )
 from futures_map_reduce import map_reduce_with_executor, map_reduce_with_executor_naive
-
-
-def is_prime(n):
-    if n == 1:
-        return False
-    elif n == 2 or n == 3:
-        return True
-    elif n % 2 == 0:
-        return False
-    elif n < 9:
-        return True
-    elif n % 3 == 0:
-        return False
-    r = int(sqrt(n))
-    # since all primes > 3 are of the form 6n ± 1
-    # start with f=5 (which is prime)
-    # and test f, f+2 for being prime
-    # then loop by 6.
-    for f in range(5, r + 1, 6):
-        if n % f == 0:
-            return False
-        elif n % (f + 2) == 0:
-            return False
-    return True
+from performance_utils import is_prime
 
 
 def count_primes_non_threaded(num_numbers):
@@ -338,12 +314,6 @@ def check_performance_with_primes():
             chunk_size_argument_name=chunk_size_argument_name,
             num_feeding_queues=num_feeding_queues,
         )
-
-
-def test_is_prime():
-    primes = [n for n in range(1, 21) if is_prime2(n)]
-    assert primes == [2, 3, 5, 7, 11, 13, 17, 19]
-    print(primes)
 
 
 if __name__ == "__main__":
