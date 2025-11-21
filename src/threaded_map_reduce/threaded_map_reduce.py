@@ -111,16 +111,29 @@ def threaded_map_with_pool_executor(map_fn, items, max_workers, chunk_size=1):
         return executor.map(map_fn, items, chunksize=chunk_size)
 
 
+class _WorkerError:
+    def __init__(self, exc):
+        self.exc = exc
+
+
 def _map_chunks_from_chunk_dispenser(chunk_dispenser, results_queue, map_fn):
     put = results_queue.put
-    for chunk in chunk_dispenser:
-        mapped_chunk = list(map(map_fn, chunk))
-        put(mapped_chunk)
-    put(UNUSED_THREAD)
+    try:
+        for chunk in chunk_dispenser:
+            mapped_chunk = list(map(map_fn, chunk))
+            put(mapped_chunk)
+    except Exception as exception:
+        put(_WorkerError(exception))
+    finally:
+        put(UNUSED_THREAD)
 
 
 def threaded_map_with_chunk_dispenser(
-    map_fn, items: Iterable, num_computing_threads: int, chunk_size: int = 100
+    map_fn,
+    items: Iterable,
+    num_computing_threads: int,
+    chunk_size: int = 100,
+    sorted=True,
 ):
     items = iter(items)
     chunk_dispenser = _ChunkDispenser(items, chunk_size)
@@ -143,10 +156,13 @@ def threaded_map_with_chunk_dispenser(
     num_closed_threads = 0
     while True:
         result = results_queue.get()
-        if result is UNUSED_THREAD:
+        if isinstance(result, _WorkerError):
+            for thread in computing_threads:
+                thread.close()
+            raise result.exc
+        elif result is UNUSED_THREAD:
             num_closed_threads += 1
             if num_closed_threads == num_computing_threads:
-                results_queue.shutdown()
                 break
         else:
             yield from result
