@@ -2,7 +2,10 @@ from time import time
 
 import numpy
 
-from threaded_map_reduce import threaded_map
+from threaded_map_reduce.threaded_map_reduce import (
+    threaded_map_with_chunk_dispenser,
+    threaded_map_with_pool_executor,
+)
 from performance_utils import is_prime
 
 
@@ -10,6 +13,7 @@ def do_non_threaded_experiment(
     num_threadss: list[int],
     chunk_sizes: list[int],
     mapping_fn,
+    threaded_mapping_fn,
     items_to_map,
     num_threads_arg_name,
 ):
@@ -26,6 +30,7 @@ def do_threaded_experiment(
     num_threadss: list[int],
     chunk_sizes: list[int],
     mapping_fn,
+    threaded_mapping_fn,
     items_to_map,
     num_threads_arg_name,
 ):
@@ -40,7 +45,7 @@ def do_threaded_experiment(
                 "chunk_size": chunk_size,
                 num_threads_arg_name: num_threads,
             }
-            threaded_result = threaded_map(**kwagrs)
+            threaded_result = threaded_mapping_fn(**kwagrs)
 
             for item_result in threaded_result:
                 item_result
@@ -66,23 +71,25 @@ def check_map_performance_with_primes():
     num_threadss = list(range(1, 17))
     mapping_fn = is_prime
 
-    experiment = {
+    experiment1 = {
         "num_threadss": num_threadss,
         "chunk_sizes": chunk_sizes,
         "mapping_fn": mapping_fn,
         "items_to_map": range(1, num_numbers_to_check),
-        "chunk_size_arg_name": "max_workers",
+        "num_threads_arg_name": "max_workers",
+        "threaded_mapping_fn": threaded_map_with_pool_executor,
     }
-    experiment = {
+    experiment2 = {
         "num_threadss": num_threadss,
         "chunk_sizes": chunk_sizes,
         "mapping_fn": mapping_fn,
         "items_to_map": range(1, num_numbers_to_check),
         "num_threads_arg_name": "num_computing_threads",
+        "threaded_mapping_fn": threaded_map_with_chunk_dispenser,
     }
-    result = do_non_threaded_experiment(**experiment)
+    result = do_non_threaded_experiment(**experiment1)
     print(f"time non threaded: {result['time']}")
-    results = do_threaded_experiment(**experiment)
+    results = do_threaded_experiment(**experiment1)
     print(results)
 
 
