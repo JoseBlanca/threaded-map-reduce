@@ -1,1 +1,1 @@
-from threaded_map_reduce.threaded_map_reduce import map_reduce
+from threaded_map_reduce.threaded_map_reduce import map_reduce, threaded_map

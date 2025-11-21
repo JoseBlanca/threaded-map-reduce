@@ -3,6 +3,7 @@ import itertools
 import threading
 import queue
 import functools
+import concurrent.futures
 
 
 class _UnusedThread:
@@ -103,3 +104,8 @@ def _map_reduce_with_thread_pool_and_buffers(
 
 
 map_reduce = _map_reduce_with_thread_pool_and_buffers
+
+
+def threaded_map(map_fn, items, max_workers, chunk_size=1):
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        return executor.map(map_fn, items, chunksize=chunk_size)
