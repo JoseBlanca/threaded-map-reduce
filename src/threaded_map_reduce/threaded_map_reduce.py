@@ -112,10 +112,11 @@ def threaded_map_with_pool_executor(map_fn, items, max_workers, chunk_size=1):
 
 
 def _map_chunks_from_chunk_dispenser(chunk_dispenser, results_queue, map_fn):
+    put = results_queue.put
     for chunk in chunk_dispenser:
-        mapped_chunk = map(map_fn, chunk)
-        results_queue.put(mapped_chunk)
-    results_queue.put(UNUSED_THREAD)
+        mapped_chunk = list(map(map_fn, chunk))
+        put(mapped_chunk)
+    put(UNUSED_THREAD)
 
 
 def threaded_map_with_chunk_dispenser(
