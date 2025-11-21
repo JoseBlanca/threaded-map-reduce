@@ -207,7 +207,7 @@ def check_performance_with_primes():
     experiment_1 = {
         "map_reduce_funct": map_reduce_with_thread_pool_and_buffers,
         "name": "thread_pool_and_buffers",
-        "chunk_size_argument_name": "buffer_size",
+        "chunk_size_argument_name": "chunk_size",
         "num_computing_threads_argument_name": "num_computing_threads",
     }
 

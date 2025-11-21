@@ -74,10 +74,10 @@ def _map_reduce_with_thread_pool_and_buffers(
     reduce_fn,
     iterable: Iterable,
     num_computing_threads: int,
-    buffer_size: int,
+    chunk_size: int,
 ):
     items = iter(iterable)
-    chunk_dispenser = _ChunkDispenser(items, buffer_size)
+    chunk_dispenser = _ChunkDispenser(items, chunk_size)
 
     results_queue = queue.Queue()
 
