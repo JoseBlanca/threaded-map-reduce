@@ -74,7 +74,7 @@ def _map_reduce_with_thread_pool_and_buffers(
     reduce_fn,
     iterable: Iterable,
     num_computing_threads: int,
-    chunk_size: int,
+    chunk_size: int = 100,
 ):
     items = iter(iterable)
     chunk_dispenser = _ChunkDispenser(items, chunk_size)
