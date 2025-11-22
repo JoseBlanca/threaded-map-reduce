@@ -1,4 +1,4 @@
-from typing import Iterable, Iterator
+from typing import Iterable, Iterator, Callable, TypeVar
 import itertools
 import threading
 import queue
@@ -190,12 +190,16 @@ def _threaded_map_with_chunk_dispenser(
                 yield from mapped_chunk
 
 
+T = TypeVar("T")
+R = TypeVar("R")
+
+
 def map(
-    map_fn,
-    items: Iterable,
+    map_fn: Callable[[T], R],
+    items: Iterable[T],
     num_computing_threads: int,
     chunk_size: int = 100,
-):
+) -> Iterator[R]:
     return _threaded_map_with_chunk_dispenser(
         map_fn=map_fn,
         items=items,
@@ -206,11 +210,11 @@ def map(
 
 
 def map_unordered(
-    map_fn,
-    items: Iterable,
+    map_fn: Callable[[T], R],
+    items: Iterable[T],
     num_computing_threads: int,
     chunk_size: int = 100,
-):
+) -> Iterator[R]:
     return _threaded_map_with_chunk_dispenser(
         map_fn=map_fn,
         items=items,
