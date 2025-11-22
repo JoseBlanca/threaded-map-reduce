@@ -12,6 +12,8 @@ class _UnusedThread:
 
 UNUSED_THREAD = _UnusedThread()
 
+orig_map = map
+
 
 class _ComputingThreadsResults:
     def __init__(self, results_queue, num_computing_threads):
@@ -55,7 +57,8 @@ def _map_reduce_chunks_from_chunk_dispenser(
     chunk_dispenser, results_queue, map_fn, reduce_fn
 ):
     chunk_results = (
-        functools.reduce(reduce_fn, map(map_fn, chunk)) for chunk in chunk_dispenser
+        functools.reduce(reduce_fn, orig_map(map_fn, chunk))
+        for chunk in chunk_dispenser
     )
 
     try:
@@ -119,22 +122,23 @@ class _WorkerError:
 def _map_chunks_from_chunk_dispenser(chunk_dispenser, results_queue, map_fn):
     put = results_queue.put
     try:
-        for chunk in chunk_dispenser:
-            mapped_chunk = list(map(map_fn, chunk))
-            put(mapped_chunk)
+        for idx, chunk in enumerate(chunk_dispenser):
+            mapped_chunk = list(orig_map(map_fn, chunk))
+            put((idx, mapped_chunk))
     except Exception as exception:
         put(_WorkerError(exception))
     finally:
         put(UNUSED_THREAD)
 
 
-def threaded_map_with_chunk_dispenser(
+def _threaded_map_with_chunk_dispenser(
     map_fn,
     items: Iterable,
     num_computing_threads: int,
     chunk_size: int = 100,
-    sorted=True,
+    unordered=True,
 ):
+    ordered = not unordered
     items = iter(items)
     chunk_dispenser = _ChunkDispenser(items, chunk_size)
 
@@ -153,19 +157,64 @@ def threaded_map_with_chunk_dispenser(
         thread.start()
         computing_threads.append(thread)
 
+    pending_chunks = {}
+    next_idx = 0
     num_closed_threads = 0
     while True:
-        result = results_queue.get()
-        if isinstance(result, _WorkerError):
-            for thread in computing_threads:
-                thread.close()
-            raise result.exc
-        elif result is UNUSED_THREAD:
+        idx_result = results_queue.get()
+
+        if idx_result is UNUSED_THREAD:
             num_closed_threads += 1
             if num_closed_threads == num_computing_threads:
+                # flush any remaining buffered chunks
+                if ordered:
+                    while next_idx in pending_chunks:
+                        yield from pending_chunks.pop(next_idx)
+                        next_idx += 1
                 break
         else:
-            yield from result
+            if ordered:
+                idx, mapped_chunk = idx_result
+                if idx == next_idx:
+                    # Emit immediately and then flush any buffered successors
+                    yield from mapped_chunk
+                    next_idx += 1
+                    while next_idx in pending_chunks:
+                        yield from pending_chunks.pop(next_idx)
+                        next_idx += 1
+                else:
+                    pending_chunks[idx] = mapped_chunk
+            else:
+                # No ordering guarantees
+                _, mapped_chunk = idx_result
+                yield from mapped_chunk
 
 
-threaded_map = threaded_map_with_chunk_dispenser
+def map(
+    map_fn,
+    items: Iterable,
+    num_computing_threads: int,
+    chunk_size: int = 100,
+):
+    return _threaded_map_with_chunk_dispenser(
+        map_fn=map_fn,
+        items=items,
+        num_computing_threads=num_computing_threads,
+        chunk_size=chunk_size,
+        unordered=False,
+    )
+
+
+def map_unordered(
+    map_fn,
+    items: Iterable,
+    num_computing_threads: int,
+    chunk_size: int = 100,
+):
+    return _threaded_map_with_chunk_dispenser(
+        map_fn=map_fn,
+        items=items,
+        num_computing_threads=num_computing_threads,
+        chunk_size=chunk_size,
+        unordered=True,
+    )
