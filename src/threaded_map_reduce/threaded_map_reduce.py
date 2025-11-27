@@ -109,7 +109,7 @@ def _map_reduce_with_thread_pool_and_buffers(
 map_reduce = _map_reduce_with_thread_pool_and_buffers
 
 
-def threaded_map_with_pool_executor(map_fn, items, max_workers, chunk_size=1):
+def _threaded_map_with_pool_executor(map_fn, items, max_workers, chunk_size=1):
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         return executor.map(map_fn, items, chunksize=chunk_size)
 

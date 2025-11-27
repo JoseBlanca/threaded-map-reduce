@@ -3,8 +3,8 @@ from time import time
 import numpy
 
 from threaded_map_reduce.threaded_map_reduce import (
-    threaded_map_with_chunk_dispenser,
-    threaded_map_with_pool_executor,
+    _threaded_map_with_chunk_dispenser,
+    _threaded_map_with_pool_executor,
 )
 from performance_utils import is_prime
 
@@ -68,6 +68,7 @@ def check_map_performance_with_primes():
     # num_numbers_to_check = 100000
     # num_numbers_to_check = 50000
     chunk_sizes = (1000, 100, 1)
+    chunk_sizes = (100,)
     num_threadss = list(range(1, 17))
     mapping_fn = is_prime
 
@@ -77,7 +78,7 @@ def check_map_performance_with_primes():
         "mapping_fn": mapping_fn,
         "items_to_map": range(1, num_numbers_to_check),
         "num_threads_arg_name": "max_workers",
-        "threaded_mapping_fn": threaded_map_with_pool_executor,
+        "threaded_mapping_fn": _threaded_map_with_pool_executor,
     }
     experiment2 = {
         "num_threadss": num_threadss,
@@ -85,11 +86,12 @@ def check_map_performance_with_primes():
         "mapping_fn": mapping_fn,
         "items_to_map": range(1, num_numbers_to_check),
         "num_threads_arg_name": "num_computing_threads",
-        "threaded_mapping_fn": threaded_map_with_chunk_dispenser,
+        "threaded_mapping_fn": _threaded_map_with_chunk_dispenser,
     }
-    result = do_non_threaded_experiment(**experiment1)
+    experiment = experiment2
+    result = do_non_threaded_experiment(**experiment)
     print(f"time non threaded: {result['time']}")
-    results = do_threaded_experiment(**experiment1)
+    results = do_threaded_experiment(**experiment)
     print(results)
 
 
