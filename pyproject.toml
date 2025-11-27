@@ -6,9 +6,16 @@ readme = "README.md"
 authors = [
     { name = "Jose Blanca", email = "jblanca@upv.es" }
 ]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
 license = "MIT"
 requires-python = ">=3.13"
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/JoseBlanca/threaded-map-reduce"
 
 [build-system]
 requires = ["hatchling"]
