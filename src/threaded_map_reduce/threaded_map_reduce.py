@@ -1,3 +1,6 @@
+# Copyright (c) 2025 Jose Blanca
+# Licensed under the MIT License. See LICENSE file for details.
+
 from typing import Iterable, Iterator, Callable, TypeVar
 import itertools
 import threading

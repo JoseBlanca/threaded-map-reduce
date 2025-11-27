@@ -6,6 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Jose Blanca", email = "jblanca@upv.es" }
 ]
+license = "MIT"
 requires-python = ">=3.13"
 dependencies = []
 
