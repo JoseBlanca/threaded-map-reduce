@@ -1,11 +1,20 @@
 from math import sqrt
 from pathlib import Path
+import sys
 
 PERFORMANCE_CHARTS_DIR = Path(__file__).parent.parent / "charts"
 BLUE = "tab:blue"
 RED = "tab:red"
 GREEN = "tab:green"
 GREY = "tab:gray"
+
+
+def get_python_version():
+    version_info = sys.version_info
+    version = f"{version_info.major}.{version_info.minor}.{version_info.micro}"
+    if "free-threading" in sys.version:
+        version += "t"
+    return version
 
 
 def is_prime(n):

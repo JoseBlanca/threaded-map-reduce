@@ -12,7 +12,15 @@ from threaded_map_reduce.threaded_map_reduce import (
     map_unordered,
 )
 from threaded_map_reduce import map as our_map
-from performance_utils import is_prime, PERFORMANCE_CHARTS_DIR, BLUE, RED, GREY, GREEN
+from performance_utils import (
+    is_prime,
+    PERFORMANCE_CHARTS_DIR,
+    BLUE,
+    RED,
+    GREY,
+    GREEN,
+    get_python_version,
+)
 
 
 def do_non_threaded_experiment(
@@ -62,7 +70,6 @@ def do_threaded_experiment(
                 for _item_result in threaded_result:
                     _item_result
 
-                # print(threaded_result[:10])
                 time_used = time() - time_start
                 times_used.append(time_used)
             times.append(mean(times_used))
@@ -78,7 +85,7 @@ def do_threaded_experiment(
 def compare_with_futures_map_performance():
     num_numbers_to_check = 5000000
     # num_numbers_to_check = 50000
-    chunk_sizes = (100,)
+    chunk_sizes = (500,)
     num_threadss = list(range(1, 7))
     mapping_fn = is_prime
     num_repeats = 5
@@ -173,18 +180,69 @@ def compare_with_futures_map_performance():
         axes.set_ylim(0, axes.get_ylim()[1])
 
     PERFORMANCE_CHARTS_DIR.mkdir(exist_ok=True)
-    plot_path = PERFORMANCE_CHARTS_DIR / "this_map_vs_futures_pool_executor_map.svg"
+    plot_path = (
+        PERFORMANCE_CHARTS_DIR
+        / f"this_map_vs_futures_pool_executor_map.{get_python_version()}.chunk_size_{chunk_sizes[0]}.svg"
+    )
     fig1.savefig(plot_path, dpi=300)
-    plot_path = PERFORMANCE_CHARTS_DIR / "this_map_vs_ideal.svg"
+    plot_path = (
+        PERFORMANCE_CHARTS_DIR
+        / f"this_map_vs_ideal.{get_python_version()}.chunk_size_{chunk_sizes[0]}.svg"
+    )
     fig2.savefig(plot_path, dpi=300)
+
+
+def check_chunk_size_relevance():
+    num_numbers_to_check = 5000000
+    # num_numbers_to_check = 100000
+    chunk_sizes = [1, 10, 20, 30, 40, 50, 100, 200, 300, 500, 750, 1000, 2000]
+    num_threads = 4
+    mapping_fn = is_prime
+    num_repeats = 5
+
+    experiment_our_map = {
+        "num_threadss": (num_threads,),
+        "chunk_sizes": chunk_sizes,
+        "mapping_fn": mapping_fn,
+        "items_to_map": range(1, num_numbers_to_check),
+        "num_threads_arg_name": "num_computing_threads",
+        "threaded_mapping_fn": our_map,
+        "num_repeats": num_repeats,
+    }
+    results = do_threaded_experiment(**experiment_our_map)
+    chunk_sizes = []
+    times = []
+    for result in results:
+        chunk_sizes.append(result["chunk_size"])
+        times.append(float(result["times"][0]))
+    fig = Figure()
+    _canvas = FigureCanvas(fig)
+    axes = fig.add_subplot(1, 1, 1)
+    axes.plot(
+        chunk_sizes,
+        times,
+        linestyle="-",
+        marker="o",
+        color=BLUE,
+        label="ideal",
+    )
+
+    axes.set_xlabel("Chunk size")
+    axes.set_ylabel("Time (s)")
+    axes.set_yscale("log")
+
+    PERFORMANCE_CHARTS_DIR.mkdir(exist_ok=True)
+    plot_path = (
+        PERFORMANCE_CHARTS_DIR / f"chunk_size_relevance.{get_python_version()}.svg"
+    )
+    fig.savefig(plot_path)
 
 
 def check_map_performance_with_primes():
     num_numbers_to_check = 3000000
     # num_numbers_to_check = 100000
     num_numbers_to_check = 50000
-    chunk_sizes = (1000, 100, 1)
-    chunk_sizes = (100,)
+    chunk_sizes = (500,)
     num_threadss = list(range(1, 5))
     mapping_fn = is_prime
 
@@ -215,5 +273,6 @@ def check_map_performance_with_primes():
 
 
 if __name__ == "__main__":
+    # check_chunk_size_relevance()
     compare_with_futures_map_performance()
     # check_map_performance_with_primes()

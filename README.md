@@ -31,6 +31,31 @@ uv pip install threaded-map-reduce
 
 ---
 
+## Chunk size
+
+The chunk size is a critical parameter for performance.
+Both map and map_reduce process items in chunks, and the parallelization overhead depends strongly on how many items are grouped into each chunk.
+
+Using very small chunks (e.g. one item per chunk) usually produces poor performance, because the cost of thread scheduling and queue operations dominates the useful work.
+Using very large chunks eventually stops giving additional speedups, and may increase memory usage.
+
+In the benchmark below, a chunk size of 1 is 6.7× slower than a chunk size of 500, and increasing the chunk size beyond 500 does not reduce the runtime further.
+The optimal chunk size depends on the specific workload.
+
+Note that each chunk is materialized as a list before being processed, so larger chunk sizes increase memory usage.
+
+Benchmark setup
+ - Task: check whether each integer from 1 to 5,000,000 is prime
+ - Workload: CPU-bound, check wether numbers are prime using the is_prime implementation shown below
+ - Threads: 4
+ - Repetitions: 5 runs per configuration; mean runtime shown
+ - Python: free-threaded CPython 3.14.0
+ - Hardware: laptop with Intel® Core™ [i7-1260P](https://www.intel.com/content/www/us/en/products/sku/226254/intel-core-i71260p-processor-18m-cache-up-to-4-70-ghz/specifications.html) (4 performance cores, 6 efficiency cores)
+
+Time used to carry out the task for different chunk sizes:
+
+![Time used to do the task for different chunk sizes](charts/chunk_size_relevance.3.14.0t.svg)
+
 ## Performance
 
 To compare the performance of the `map` function implemented in this library
@@ -39,27 +64,27 @@ with the standard-library implementation in
 
 - Task: check whether each integer from 1 to 5,000,000 is prime
 - Workload: CPU-bound, using the same `is_prime` implementation for all tests (see the code at the end of this section)
-- Chunk size for all parallel map implementations: 100
+- Chunk size for all parallel map implementations: 500
 - Repetitions: 5 runs per configuration, reporting the mean runtime
 - Python: free-threaded CPython 3.14.0
 - Hardware: laptop with Intel® Core™ [i7-1260P](https://www.intel.com/content/www/us/en/products/sku/226254/intel-core-i71260p-processor-18m-cache-up-to-4-70-ghz/specifications.html) (4 performance cores, 6 efficiency cores)
 
 ### ThreadPoolExecutor.map vs this library’s `map`
 
-![futures map vs this map performance](charts/this_map_vs_futures_pool_executor_map.svg)
+![futures map vs this map performance](charts/this_map_vs_futures_pool_executor_map.3.14.0t.chunk_size_500.svg)
 
-In this benchmark, the `ThreadPoolExecutor.map` implementation is 3.79 (1 thread) times slower than the `threaded_map` implementation when using a single
+In this benchmark, the `ThreadPoolExecutor.map` implementation is 4.11 (1 thread) times slower than the `threaded_map` implementation when using a single
 thread, and its performance degrades further as the number of threads
-increases (e.g. 5.4 slower with (4 threads)).
+increases (e.g. 5.99 slower with (4 threads)).
 
 ### Ideal scaling vs this library’s `map`
 
-![ideal vs this map performance](charts/this_map_vs_ideal.svg)
+![ideal vs this map performance](charts/this_map_vs_ideal.3.14.0t.chunk_size_500.svg)
 
 The performance of this library’s map implementation improves with the number of threads.
 For this task there is no appreciable difference between the ordered and unordered maps.
 
-Compared with the ideal scaling, for two and four threads our implementation is 1.17 and 1.54 times slower respectively.
+Compared with the ideal scaling, for two and four threads our implementation is 1.19 and 1.54 times slower respectively.
 In an ideal scenario, the runtime with N threads to perform the task should be the time with just one thread (using the standard non-threaded [map](https://docs.python.org/3/library/functions.html#map) implementation) divided by N.
 
 The is_prime function used was:
