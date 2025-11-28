@@ -1,4 +1,11 @@
 from math import sqrt
+from pathlib import Path
+
+PERFORMANCE_CHARTS_DIR = Path(__file__).parent.parent / "charts"
+BLUE = "tab:blue"
+RED = "tab:red"
+GREEN = "tab:green"
+GREY = "tab:gray"
 
 
 def is_prime(n):
