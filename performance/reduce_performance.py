@@ -185,10 +185,10 @@ def plot_results(
 
 
 def check_performance_with_primes():
-    num_numbers_to_check = 1000000
+    num_numbers_to_check = 5000000
     # num_numbers_to_check = 100000
     # num_numbers_to_check = 50000
-    num_items_per_chunks_to_test = (100,)
+    num_items_per_chunks_to_test = (500,)
     num_threadss = list(range(1, 7))
     num_repeats = 5
 
@@ -274,6 +274,7 @@ def check_performance_with_primes():
     ]
     # experiments = [experiment_1]
     for experiment in experiments:
+        print(experiment["name"])
         this_charts_dir = charts_dir / f"{experiment['name']}"
         this_charts_dir.mkdir(exist_ok=True)
 
@@ -297,6 +298,7 @@ def check_performance_with_primes():
             initial_reduce_value=experiment.get("initial_reduce_value"),
             num_repeats=num_repeats,
         )
+        print(results)
 
         plot_results(
             experiment["name"],
