@@ -1,6 +1,6 @@
 [project]
 name = "threaded_map_reduce"
-version = "0.1.0"
+version = "0.1.1"
 description = "A threaded version of map reduce"
 readme = "README.md"
 authors = [
