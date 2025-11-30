@@ -75,13 +75,73 @@ def _map_reduce_chunks_from_chunk_dispenser(
     results_queue.put(result)
 
 
-def _map_reduce_with_thread_pool_and_buffers(
+def map_reduce(
     map_fn,
     reduce_fn,
     iterable: Iterable,
     num_computing_threads: int,
     chunk_size: int = 100,
 ):
+    """
+    Apply a function to an iterable in parallel using threads and reduce the results.
+
+    Items are processed in chunks across multiple threads, and each
+    chunk's mapped results are reduced into a partial value. Partial values are
+    then combined using ``reduce_fn`` until a single final result is obtained.
+
+    The function is intended for workloads where independent computations can be
+    mapped in parallel and the results can be combined using an associative
+    reduction function. For CPU-bound workloads this is most effective on
+    free-threaded Python builds.
+
+    Parameters
+    ----------
+    map_fn
+        Callable applied to each item in ``items``. It must be safe to call
+        from multiple threads concurrently.
+    reduce_fn
+        Callable that combines two mapped results into one. It must be
+        associative for correct and predictable behaviour.
+    items
+        Iterable of input items. It is consumed lazily: items are pulled and
+        processed in chunks until the iterable is exhausted.
+    num_computing_threads
+        Number of worker threads used to process chunks.
+    chunk_size
+        Number of items grouped into each chunk (default: 100). Small chunk
+        sizes increase parallelization overhead (more queue operations and
+        context switches), while very large chunk sizes increase memory usage
+        and usually do not improve performance beyond a certain point. The
+        optimal value is workload-dependent.
+
+    Returns
+    -------
+    R
+        The final reduced value obtained by applying ``reduce_fn`` across all
+        mapped results.
+
+    Notes
+    -----
+    * If ``map_fn`` raises an exception in any worker thread, the exception is
+      propagated and the reduction stops.
+    * ``reduce_fn`` should be associative, e.g. addition, multiplication,
+      minimum, maximum, logical operations, or custom associative functions.
+      Non-associative reductions may produce results that depend on chunking
+      and processing order.
+
+    Examples
+    --------
+    Compute the sum of squares:
+
+    >>> from operator import add
+    >>> from threaded_map_reduce import map_reduce
+    >>> def square(x: int) -> int:
+    ...     return x * x
+    ...
+    >>> nums = range(6)
+    >>> map_reduce(square, add, nums, num_computing_threads=4, chunk_size=50)
+    55
+    """
     items = iter(iterable)
     chunk_dispenser = _ChunkDispenser(items, chunk_size)
 
@@ -109,7 +169,7 @@ def _map_reduce_with_thread_pool_and_buffers(
     return result
 
 
-map_reduce = _map_reduce_with_thread_pool_and_buffers
+_map_reduce_with_thread_pool_and_buffers = map_reduce
 
 
 def _threaded_map_with_pool_executor(map_fn, items, max_workers, chunk_size=1):
@@ -203,6 +263,60 @@ def map(
     num_computing_threads: int,
     chunk_size: int = 100,
 ) -> Iterator[R]:
+    """
+    Apply a function to an iterable in parallel using threads, preserving input order.
+
+    This function behaves like the built-in :func:`map`, but processes items in
+    multiple threads and it is intended to be used with the free-threaded Python for
+    CPU-bound workloads.
+
+    Items are internally grouped into chunks of size ``chunk_size`` to reduce scheduling
+    and queue overhead.
+
+    Parameters
+    ----------
+    map_fn
+        Callable applied to each item in ``items``. It must be safe to call
+        from multiple threads concurrently.
+    items
+        Iterable of input items. It is consumed lazily: items are pulled and
+        processed in chunks until the iterable is exhausted.
+    num_computing_threads
+        Number of worker threads used to process chunks.
+    chunk_size
+        Number of items grouped into each chunk (default: 100). Small chunk
+        sizes increase parallelization overhead (more queue operations and
+        context switches), while very large chunk sizes increase memory usage
+        and usually do not improve performance beyond a certain point. The
+        optimal value is workload-dependent.
+
+    Returns
+    -------
+    Iterator[R]
+        An iterator yielding the results of ``map_fn(item)`` for each item in
+        ``items``, in the same order as the original iterable.
+
+    Notes
+    -----
+    * If ``map_fn`` raises an exception in any worker thread, the exception is
+      propagated to the consumer when the corresponding result is requested,
+      and iteration stops.
+    * For workloads where result ordering does not matter, consider using
+      :func:`map_unordered`, which can be slightly more efficient.
+
+    Examples
+    --------
+    Basic usage:
+
+    >>> from threaded_map_reduce import map as threaded_map
+    >>> def square(x: int) -> int:
+    ...     return x * x
+    ...
+    >>> nums = range(10)
+    >>> list(threaded_map(square, nums, num_computing_threads=4, chunk_size=50))
+    [0, 1, 4, 9, 16, 25, 36, 49, 64, 81]
+    """
+
     return _threaded_map_with_chunk_dispenser(
         map_fn=map_fn,
         items=items,
@@ -218,6 +332,61 @@ def map_unordered(
     num_computing_threads: int,
     chunk_size: int = 100,
 ) -> Iterator[R]:
+    """
+    Apply a function to an iterable in parallel using threads, without preserving input order.
+
+    This function behaves like :func:`map`, but results are yielded as soon as
+    each chunk is processed, regardless of their original position. For
+    workloads where ordering does not matter, this can provide slightly better
+    throughput than the ordered :func:`map`.
+
+    As with the ordered variant, items are grouped into chunks of size
+    ``chunk_size`` to reduce scheduling and queue overhead, and this function is
+    intended to be used with free-threaded Python for CPU-bound tasks.
+
+    Parameters
+    ----------
+    map_fn
+        Callable applied to each item in ``items``. It must be safe to call
+        from multiple threads concurrently.
+    items
+        Iterable of input items. It is consumed lazily: items are pulled and
+        processed in chunks until the iterable is exhausted.
+    num_computing_threads
+        Number of worker threads used to process chunks.
+    chunk_size
+        Number of items grouped into each chunk (default: 100). Small chunk
+        sizes increase parallelization overhead (more queue operations and
+        context switches), while very large chunk sizes increase memory usage
+        and usually do not improve performance beyond a certain point. The
+        optimal value is workload-dependent.
+
+    Returns
+    -------
+    Iterator[R]
+        An iterator yielding the results of ``map_fn(item)`` for each item in
+        ``items``, in whatever order results become available.
+
+    Notes
+    -----
+    * Result order is **not** preserved. The first results yielded correspond to
+      whichever chunk finishes first.
+    * If ``map_fn`` raises an exception in any worker thread, the exception is
+      propagated to the consumer when the corresponding result is requested,
+      and iteration stops.
+
+    Examples
+    --------
+    Basic usage:
+
+    >>> from threaded_map_reduce import map_unordered
+    >>> def square(x: int) -> int:
+    ...     return x * x
+    ...
+    >>> nums = range(10)
+    >>> sorted(map_unordered(square, nums, num_computing_threads=4, chunk_size=50))
+    [0, 1, 4, 9, 16, 25, 36, 49, 64, 81]
+    """
     return _threaded_map_with_chunk_dispenser(
         map_fn=map_fn,
         items=items,
