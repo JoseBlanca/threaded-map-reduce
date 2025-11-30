@@ -29,7 +29,65 @@ pip install threaded-map-reduce
 uv pip install threaded-map-reduce
 ```
 
----
+## Quick Start
+
+### 1. Parallel map (ordered)
+
+```python
+from threaded_map_reduce import map
+
+def square(x):
+    return x * x
+
+nums = range(1000)
+result = list(threaded_map(square, nums, num_computing_threads=4, chunk_size=100))
+print(result[-10:])
+```
+
+### 2. Parallel map (unordered)
+
+Faster, but order is not preserved:
+
+```python
+from threaded_map_reduce import map_unordered
+
+nums = range(1000)
+result = list(map_unordered(square, nums, num_computing_threads=4, chunk_size=100))
+print(sorted(result))
+print(result[-10:])
+```
+
+### 3. Parallel map-reduce
+
+Useful for reductions such as sums, counts, or any associative operation.
+
+```python
+from operator import add
+from threaded_map_reduce import map_reduce
+
+def square(x):
+    return x * x
+
+nums = range(0, 1000)
+result = map_reduce(square, add, nums,
+                    num_computing_threads=4,
+                    chunk_size=100)
+print(result)
+```
+
+## API Summary
+
+### `threaded_map(map_fn, items: Iterable, num_computing_threads: int, chunk_size: int = (100,)`
+
+Runs `map_fn` over every item in parallel and yields results keeping input order.
+
+### `threaded_map(map_fn, items: Iterable, num_computing_threads: int, chunk_size: int = (100,)`
+
+Same as above, but yields items in any order.
+
+### `map_reduce(map_fn, reduce_fn, iterable: Iterable, num_computing_threads: int, chunk_size: int = 100,)`
+
+Maps items in parallel, reduces mapped chunks using the provided reducer function, and returns a single result.
 
 ## Performance
 
@@ -118,73 +176,112 @@ def is_prime(n):
     return True
 ```
 
-## Quick Start
 
-### 1. Parallel map (ordered)
+## `map-reduce` alternative implementations
 
-```python
-from threaded_map_reduce import map
+The `map-reduce` function was implemented using different architectures to check which one was the most performant.
 
-def square(x):
-    return x * x
+### ThreadPoolExecutor
 
-nums = range(1000)
-result = list(threaded_map(square, nums, num_computing_threads=4, chunk_size=100))
-print(result[-10:])
+Architecture:
+- A [ThreadPoolExecutor](https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ThreadPoolExecutor) is created.
+- Each item a mapping task is created using the ThreadPoolExecutor's map method and the task is represented by a [Future](https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Future) object that eventually will hold the result of the mapping.
+- The `Future` objects are used by the reduce function.
+
+![ThreadPoolExecutor map reduce performance](charts/thread_pool_executor_naive/reduce.3.14.0t.time.svg)
+
+The result of this approach was pretty bad, the execution time was around 10 times larger than with a naive non-threaded approach and it did not improved wit the number of threads.
+
+This is the code for this approach.
+
+```{python}
+def map_reduce_with_executor_naive(
+    map_fn,
+    reduce_fn,
+    items,
+    max_workers,
+    initial_reduce_value=None,
+):
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = []
+        reduced_result = initial_reduce_value
+        for item in items:
+            future = executor.submit(map_fn, item)
+            futures.append(future)
+
+            if len(futures) > max_workers:
+                future = futures.pop()
+                result = future.result()
+                reduced_result = reduce_fn(result, reduced_result)
+
+        for future in futures:
+            reduced_result = reduce_fn(future.result(), reduced_result)
+    return reduced_result
 ```
 
----
+### ThreadPoolExecutors with chunk
 
-### 2. Parallel map (unordered)
+Another attempt using ThreadPoolExcutor was done, but instead of mapping every item, they were packed in chunks and those chunks were then mapped and reduced.
 
-Faster, but order is not preserved:
+![ThreadPoolExecutor with chunks map reduce performance](charts/thread_pool_executor/reduce.3.14.0t.num_items_per_chunk_500.time.svg)
 
-```python
-from threaded_map_reduce import map_unordered
+The time in this case was similar to the non-threaded one, but it did not improved with the number of threads.
 
-nums = range(1000)
-result = list(map_unordered(square, nums, num_computing_threads=4, chunk_size=100))
-print(sorted(result))
-print(result[-10:])
+
+### Thread-safe iterator and computing threads
+
+Iterators are not thread safe in Python, but we can use a lock to solve the issue.
+
+```{python}
+class ThreadSafeIterator(Iterator):
+    def __init__(self, it):
+        self._it = iter(it)
+        self._lock = threading.Lock()
+
+    def __next__(self):
+        with self._lock:
+            return next(self._it)
 ```
 
----
+Now that we have a thread safe iterator we can spawn a set of computing threads that will do the map and reduction put their results in a queue and, finally, an additional step to reduce the results of each computing thread.
 
-### 3. Parallel map-reduce
+![Thread safe iterator and computing threads map reduce performance](charts/naive_map_reduce/reduce.3.14.0t.time.svg)
 
-Useful for reductions such as sums, counts, or any associative operation.
+The time with 1 thread in this implementation is similar to the non-threaded map-reduce, and the time was cut down when 2 or 3 computing threads were added, but it did not improved with more threads.
 
-```python
-from operator import add
-from threaded_map_reduce import map_reduce
+### Chunks and computing threads
 
-def square(x):
-    return x * x
+In the implementation based on the thread-safe iterator the lock used to yield each item might be the bottleneck, so more computing threads might not improve the performance because they will be waiting to get an item to process.
 
-nums = range(0, 1000)
-result = map_reduce(square, add, nums,
-                    num_computing_threads=4,
-                    chunk_size=100)
-print(result)
+The approach used used by this library is similar to the previous one, but instead of processing items, it processes chunks of items.
+The class in charge of delivering the chunks to be mapped and reduced makes sure that the chunk yielding is thread-safe by using a lock.
+
+```<python>
+class _ChunkDispenser(Iterator):
+    def __init__(self, it, chunk_size):
+        self._it = iter(it)
+        self._lock = threading.Lock()
+        self._chunk_size = chunk_size
+
+    def __next__(self):
+        with self._lock:
+            chunk = list(itertools.islice(self._it, self._chunk_size))
+            if not chunk:
+                raise StopIteration
+            else:
+                return chunk
+
 ```
 
----
+The chunks are then mapped and reduced by a pool of computing threads that put their final reduced result into a queue that the main thread reduces when their computing is done.
 
-## API Summary
+![Chunk thread safe iterator and computing threads map reduce performance](charts/thread_pool_no_feeding_queue/reduce.3.14.0t.num_items_per_chunk_500.time.svg)
 
-### `threaded_map(map_fn, items, num_computing_threads, chunk_size)`
+This implementation gave the best result.
 
-Runs `map_fn` over every item in parallel and yields results keeping input order.
+### More complex implementations
 
-### `map_unordered(map_fn, items, num_computing_threads, chunk_size)`
-
-Same as above, but yields items in any order.
-
-### `map_reduce(map_fn, reduce_fn, items, num_computing_threads, chunk_size)`
-
-Maps items in parallel, reduces mapped chunks using the provided reducer function, and returns a single result.
-
----
+Other more complex approaches we also tried, but none worked as well as the previous one.
 
 ## License
 
