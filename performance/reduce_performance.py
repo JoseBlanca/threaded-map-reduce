@@ -1,8 +1,7 @@
 from time import time
 from functools import reduce, partial
 from operator import add
-from pathlib import Path
-import sys
+from statistics import mean
 
 import numpy
 import matplotlib.pyplot as plt
@@ -14,7 +13,12 @@ from other_implementations import (
     map_reduce_with_thread_pool_with_feeding_queues,
 )
 from futures_map_reduce import map_reduce_with_executor, map_reduce_with_executor_naive
-from performance_utils import is_prime
+from performance_utils import (
+    is_prime,
+    PERFORMANCE_CHARTS_DIR,
+    get_python_version,
+    BLUE,
+)
 
 
 def count_primes_non_threaded(num_numbers):
@@ -27,19 +31,22 @@ def count_primes_non_threaded(num_numbers):
     return {"time": time_used, "result": total}
 
 
-def count_primes_threaded(
-    num_numbers,
-    map_reduce_funct,
-):
-    numbers = range(1, num_numbers)
-    start_time = time()
-    total = map_reduce_funct(
-        is_prime,
-        add,
-        numbers,
-    )
-    time_used = time() - start_time
-    return {"time_used": time_used, "result": total}
+def count_primes_threaded(num_numbers, map_reduce_funct, num_repeats):
+    times = []
+    total = None
+    for _repeat_idx in range(num_repeats):
+        numbers = range(1, num_numbers)
+        start_time = time()
+        total = map_reduce_funct(
+            is_prime,
+            add,
+            numbers,
+        )
+        time_used = time() - start_time
+        times.append(time_used)
+    if total is None:
+        raise ValueError("At least one repeat should be done")
+    return {"time_used": mean(times), "result": total}
 
 
 def check_count_primes_performance(
@@ -48,6 +55,7 @@ def check_count_primes_performance(
     map_reduce_funct,
     num_computing_threads_argument_name,
     initial_reduce_value,
+    num_repeats,
 ):
     times_used = []
     results = []
@@ -57,8 +65,7 @@ def check_count_primes_performance(
             kwargs["initial_reduce_value"] = initial_reduce_value
         this_map_reduce_funct = partial(map_reduce_funct, **kwargs)
         res = count_primes_threaded(
-            numbers_to_check,
-            this_map_reduce_funct,
+            numbers_to_check, this_map_reduce_funct, num_repeats
         )
         times_used.append(res["time_used"])
         results.append(res["result"])
@@ -78,6 +85,7 @@ def do_prime_experiment_with_several_chunk_sizes(
     num_computing_threads_argument_name,
     num_feeding_queues,
     initial_reduce_value,
+    num_repeats,
 ):
     non_threaded_result = count_primes_non_threaded(num_numbers_to_check)
     result = {
@@ -101,6 +109,7 @@ def do_prime_experiment_with_several_chunk_sizes(
             this_map_reduce_funct,
             num_computing_threads_argument_name,
             initial_reduce_value=initial_reduce_value,
+            num_repeats=num_repeats,
         )
         assert numpy.all(res["results"] == non_threaded_result)
         this_result = {
@@ -112,21 +121,13 @@ def do_prime_experiment_with_several_chunk_sizes(
     return result
 
 
-def get_python_version():
-    version_info = sys.version_info
-    version = f"{version_info.major}.{version_info.minor}.{version_info.micro}"
-    if "free-threading" in sys.version:
-        version += "t"
-    return version
-
-
 def plot_results(
     experiment_name, results, charts_dir, chunk_size_argument_name, num_feeding_queues
 ):
     non_threaded_time = results["non_threaded_time"]
     nice_experiment_name = experiment_name.capitalize().replace("_", " ")
 
-    base_fname = f"{get_python_version()}"
+    base_fname = f"reduce.{get_python_version()}"
     for result in results["results_for_different_chunk_sizes"]:
         chunk_size = result["chunk_size"]
         if num_feeding_queues and chunk_size_argument_name:
@@ -139,14 +140,14 @@ def plot_results(
             title = f"{nice_experiment_name}"
             this_base_fname = f"{base_fname}"
 
-        plot_path = charts_dir / f"{this_base_fname}.time.png"
+        plot_path = charts_dir / f"{this_base_fname}.time.svg"
         fig, axes = plt.subplots()
         axes.plot(
             result["n_threads"],
             result["times"],
             linestyle="-",
             marker="o",
-            color="blue",
+            color=BLUE,
             label="threaded",
         )
         ideal_times = non_threaded_time / result["n_threads"]
@@ -158,14 +159,6 @@ def plot_results(
             color="grey",
             label="ideal",
         )
-        xmin, xmax = axes.get_xlim()
-        axes.hlines(
-            non_threaded_time,
-            xmin=xmin,
-            xmax=xmax,
-            color="red",
-            label="non_threaded",
-        )
         axes.set_ylim(bottom=0, top=axes.get_ylim()[1])
         axes.set_ylabel("Time (s)")
         axes.set_xlabel("Num. threads")
@@ -175,14 +168,14 @@ def plot_results(
 
         speedup = non_threaded_time / result["times"]
         efficiency = speedup / result["n_threads"]
-        plot_path = charts_dir / f"{this_base_fname}.efficiency.png"
+        plot_path = charts_dir / f"{this_base_fname}.efficiency.svg"
         fig, axes = plt.subplots()
         axes.plot(
             result["n_threads"],
             efficiency,
             linestyle="-",
             marker="o",
-            color="blue",
+            color=BLUE,
         )
         axes.set_ylim(bottom=0, top=axes.get_ylim()[1])
         axes.set_ylabel("Efficiency")
@@ -195,8 +188,9 @@ def check_performance_with_primes():
     num_numbers_to_check = 1000000
     # num_numbers_to_check = 100000
     # num_numbers_to_check = 50000
-    num_items_per_chunks_to_test = (1000, 100, 1)
-    num_threadss = list(range(1, 17))
+    num_items_per_chunks_to_test = (100,)
+    num_threadss = list(range(1, 7))
+    num_repeats = 5
 
     # Iterator is chunked.
     # While a chunk is being created a lock is put in the iterator because iterators are not thread safe
@@ -267,11 +261,7 @@ def check_performance_with_primes():
         "chunk_size_argument_name": "num_items_per_chunk",
     }
 
-    base_charts_dir = Path(__file__).parent / "charts"
-    base_charts_dir.mkdir(exist_ok=True)
-    charts_dir = base_charts_dir / "primes"
-    charts_dir.mkdir(exist_ok=True)
-    charts_dir = charts_dir / f"num_numbers_{num_numbers_to_check}"
+    charts_dir = PERFORMANCE_CHARTS_DIR
     charts_dir.mkdir(exist_ok=True)
 
     experiments = [
@@ -282,7 +272,7 @@ def check_performance_with_primes():
         experiment_5,
         experiment_6,
     ]
-    experiments = [experiment_1]
+    # experiments = [experiment_1]
     for experiment in experiments:
         this_charts_dir = charts_dir / f"{experiment['name']}"
         this_charts_dir.mkdir(exist_ok=True)
@@ -305,6 +295,7 @@ def check_performance_with_primes():
             ],
             num_feeding_queues=num_feeding_queues,
             initial_reduce_value=experiment.get("initial_reduce_value"),
+            num_repeats=num_repeats,
         )
 
         plot_results(
@@ -318,4 +309,3 @@ def check_performance_with_primes():
 
 if __name__ == "__main__":
     check_performance_with_primes()
-    # test_is_prime()
