@@ -39,10 +39,19 @@ class _ComputingThreadsResults:
 
 
 class _ChunkDispenser(Iterator):
+    """It hands out the chunks of the items, with the index of every chunk.
+
+    The index has to be given here, while the lock is held, and not by each
+    worker counting the chunks that it takes, because the workers take the
+    chunks from this one dispenser and every one of them would start counting
+    from zero, so the index would say nothing about the order of the items.
+    """
+
     def __init__(self, it, chunk_size):
         self._it = iter(it)
         self._lock = threading.Lock()
         self._chunk_size = chunk_size
+        self._next_idx = 0
 
     def __next__(self):
         with self._lock:
@@ -52,8 +61,9 @@ class _ChunkDispenser(Iterator):
             chunk = list(itertools.islice(self._it, self._chunk_size))
             if not chunk:
                 raise StopIteration
-            else:
-                return chunk
+            idx = self._next_idx
+            self._next_idx += 1
+            return idx, chunk
 
 
 def _map_reduce_chunks_from_chunk_dispenser(
@@ -61,7 +71,7 @@ def _map_reduce_chunks_from_chunk_dispenser(
 ):
     chunk_results = (
         functools.reduce(reduce_fn, orig_map(map_fn, chunk))
-        for chunk in chunk_dispenser
+        for _, chunk in chunk_dispenser
     )
 
     try:
@@ -185,7 +195,7 @@ class _WorkerError:
 def _map_chunks_from_chunk_dispenser(chunk_dispenser, results_queue, map_fn):
     put = results_queue.put
     try:
-        for idx, chunk in enumerate(chunk_dispenser):
+        for idx, chunk in chunk_dispenser:
             mapped_chunk = list(orig_map(map_fn, chunk))
             put((idx, mapped_chunk))
     except Exception as exception:
